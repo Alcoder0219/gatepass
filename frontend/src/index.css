@@ -1,0 +1,213 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Design tokens. Light and dark are the same variable names with different
+ * values, so every component is written once and themes for free.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@layer base {
+  :root {
+    --surface: 255 255 255;
+    --surface-raised: 255 255 255;
+    --surface-sunken: 248 250 252;
+    --content: 15 23 42;
+    --content-muted: 71 85 105;
+    --content-subtle: 148 163 184;
+    --line: 226 232 240;
+
+    --glass-bg: 255 255 255 / 0.72;
+    --glass-border: 255 255 255 / 0.6;
+    --page-bg: 241 245 249;
+  }
+
+  .dark {
+    --surface: 17 24 39;
+    --surface-raised: 24 32 50;
+    --surface-sunken: 12 17 29;
+    --content: 241 245 249;
+    --content-muted: 148 163 184;
+    --content-subtle: 100 116 139;
+    --line: 39 51 73;
+
+    --glass-bg: 24 32 50 / 0.66;
+    --glass-border: 255 255 255 / 0.08;
+    --page-bg: 8 12 22;
+  }
+
+  * {
+    @apply border-line;
+  }
+
+  /*
+   * Flex and grid items compute `min-width: auto`, which refuses to shrink below
+   * their content's intrinsic size — a date input, a long word, a `nowrap` label —
+   * and so forces horizontal page overflow on narrow phones. Reset it everywhere;
+   * anything that must keep a floor sets it explicitly (`min-w-*`, `shrink-0`).
+   */
+  *:not(svg *) {
+    min-width: 0;
+  }
+
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    @apply text-content antialiased;
+    background-color: rgb(var(--page-bg));
+    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
+    /* Ambient mesh — the depth behind the glass panels. */
+    background-image: theme('backgroundImage.mesh');
+    background-attachment: fixed;
+    min-height: 100dvh;
+  }
+
+  /* Respect the user's motion preference — every animation degrades to none. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
+  ::selection {
+    @apply bg-brand-500/25 text-content;
+  }
+
+  /* Slim, theme-aware scrollbars. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full border-4 border-solid border-transparent bg-content-subtle/30 bg-clip-padding;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-content-subtle/50;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-2 ring-brand-500/70 ring-offset-2;
+    --tw-ring-offset-color: rgb(var(--page-bg));
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Component primitives
+ * ─────────────────────────────────────────────────────────────────────────── */
+@layer components {
+  /* The signature surface: frosted, bordered, softly lifted. */
+  .glass {
+    background-color: rgb(var(--glass-bg));
+    border: 1px solid rgb(var(--glass-border));
+    @apply shadow-glass backdrop-blur-xl backdrop-saturate-150;
+  }
+
+  .glass-strong {
+    background-color: rgb(var(--surface-raised));
+    border: 1px solid rgb(var(--line));
+    @apply shadow-glass;
+  }
+
+  .card {
+    @apply glass rounded-2xl;
+  }
+
+  /* Sheen that sweeps a card on hover — used on the dashboard stat tiles. */
+  .card-hover {
+    @apply relative overflow-hidden transition-all duration-300 ease-spring;
+  }
+  .card-hover::after {
+    content: '';
+    @apply pointer-events-none absolute inset-0 -translate-x-full bg-shimmer opacity-0;
+  }
+  .card-hover:hover {
+    @apply -translate-y-0.5 shadow-glass-lg;
+  }
+  .card-hover:hover::after {
+    @apply animate-shimmer opacity-100;
+  }
+
+  .gradient-text {
+    @apply bg-brand-gradient bg-clip-text text-transparent;
+  }
+
+  /* Loading skeleton — a moving sheen rather than a flat pulse. */
+  .skeleton {
+    @apply relative overflow-hidden rounded-lg bg-content-subtle/10;
+  }
+  .skeleton::after {
+    content: '';
+    @apply absolute inset-0 -translate-x-full animate-shimmer bg-shimmer;
+  }
+
+  /* Sidebar nav item + its active indicator rail. */
+  .nav-item {
+    @apply relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
+           text-content-muted transition-all duration-200
+           hover:bg-content/5 hover:text-content;
+  }
+  .nav-item-active {
+    @apply bg-brand-500/10 text-brand-600 dark:text-brand-300;
+  }
+  .nav-item-active::before {
+    content: '';
+    @apply absolute inset-y-1.5 -left-2 w-1 rounded-full bg-brand-gradient;
+  }
+
+  .input-base {
+    @apply w-full rounded-xl border border-line bg-surface/60 px-3.5 py-2.5 text-sm text-content
+           placeholder:text-content-subtle
+           transition-all duration-200
+           focus:border-brand-500 focus:bg-surface focus:outline-none focus:ring-4 focus:ring-brand-500/10
+           disabled:cursor-not-allowed disabled:opacity-60;
+  }
+
+  .table-row-hover {
+    @apply transition-colors duration-150 hover:bg-brand-500/[0.04];
+  }
+}
+
+@layer utilities {
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Safe-area padding for iOS home-indicator devices. */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+ * Print — the gate pass print view must survive without the app chrome.
+ * ─────────────────────────────────────────────────────────────────────────── */
+@media print {
+  body {
+    background: #fff !important;
+    background-image: none !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-page {
+    box-shadow: none !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #fff !important;
+    backdrop-filter: none !important;
+  }
+}

@@ -1,0 +1,78 @@
+# Production stack. Secrets come from `.env` (gitignored) — see .env.example.
+#
+# The database is MongoDB Atlas, not a container: managed backups, and the data
+# outlives the host. There is deliberately no `mongo` service here.
+#
+#   docker compose up -d --build
+#   docker compose run --rm api npm run seed:prod   # first boot only
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: gatepass-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 5000
+      API_PREFIX: /api/v1
+
+      # Atlas. Required — compose refuses to start without it.
+      MONGODB_URI: ${MONGODB_URI:?set MONGODB_URI in .env}
+
+      CLIENT_URL: ${CLIENT_URL:-http://localhost:8080}
+
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET:?set JWT_ACCESS_SECRET in .env}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:?set JWT_REFRESH_SECRET in .env}
+      JWT_ACCESS_EXPIRES_IN: 15m
+      JWT_REFRESH_EXPIRES_IN: 7d
+      JWT_REFRESH_EXPIRES_IN_REMEMBER: 30d
+
+      # Consumed only by `npm run seed:prod`.
+      SUPERADMIN_NAME: ${SUPERADMIN_NAME:-Super Admin}
+      SUPERADMIN_EMAIL: ${SUPERADMIN_EMAIL:?set SUPERADMIN_EMAIL in .env}
+      SUPERADMIN_PASSWORD: ${SUPERADMIN_PASSWORD:?set SUPERADMIN_PASSWORD in .env}
+      SUPERADMIN_EMPLOYEE_ID: ${SUPERADMIN_EMPLOYEE_ID:-EMP0001SA}
+
+      # The expiry sweep is in-process: true on exactly one replica.
+      JOBS_ENABLED: ${JOBS_ENABLED:-true}
+
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      MAIL_FROM: ${MAIL_FROM:-Amson Group <no-reply@amsongroup.com>}
+
+      BCRYPT_SALT_ROUNDS: 12
+      RATE_LIMIT_WINDOW_MINUTES: 15
+      RATE_LIMIT_MAX: 300
+    volumes:
+      # Uploads and logs must outlive the container.
+      - uploads:/app/uploads
+      - logs:/app/src/logs
+    expose:
+      - '5000'
+    healthcheck:
+      test: ['CMD', 'node', '-e', "fetch('http://localhost:5000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        # Vite inlines env vars at BUILD time. Same-origin: nginx proxies /api.
+        VITE_API_URL: ${VITE_API_URL:-/api/v1}
+    container_name: gatepass-web
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - '8080:80'
+
+volumes:
+  uploads:
+  logs:

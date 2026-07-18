@@ -4,6 +4,7 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { sendSuccess, sendCreated } from '../utils/ApiResponse.js';
 import { recordAudit, diff } from '../services/audit.service.js';
+import { clearAuthCache } from '../utils/authCache.js';
 import { AUDIT_ACTION, PERMISSION_CATALOGUE, DATA_SCOPES } from '../constants/index.js';
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -98,6 +99,10 @@ export const updateRole = asyncHandler(async (req, res) => {
   Object.assign(role, payload);
   role.updatedBy = req.user._id;
   await role.save();
+  // Permissions / dataScope / restrictions here change the effective access of
+  // every user holding this role — drop all cached auth contexts so the change
+  // is reflected on their next request rather than after the TTL.
+  clearAuthCache();
 
   const changes = diff(before, snapshot(role, Object.keys(payload)));
 

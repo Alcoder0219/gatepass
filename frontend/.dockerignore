@@ -1,0 +1,23 @@
+# Dependencies — reinstalled inside the build stage with `npm ci`
+node_modules
+npm-debug.log*
+
+# Prior build output — the image rebuilds `dist/` from source
+dist
+
+# Secrets & local config — Vite vars are passed as build ARGs, never copied in
+.env
+.env.*
+!.env.example
+
+# VCS / tooling / editor noise
+.git
+.gitignore
+.dockerignore
+Dockerfile
+.vscode
+.idea
+.DS_Store
+
+# Docs
+*.md

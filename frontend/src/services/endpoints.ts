@@ -21,6 +21,7 @@ import type {
   Settings,
   Unit,
   User,
+  UserImportSummary,
 } from '@/types';
 
 /**
@@ -129,8 +130,6 @@ export const gatePassApi = {
 
   remove: (id: string) => request<null>({ url: `/gate-passes/${id}`, method: 'DELETE' }),
 
-  qr: (id: string) => request<{ qrCode: string }>({ url: `/gate-passes/${id}/qr` }),
-
   print: (id: string) => request<GatePass>({ url: `/gate-passes/${id}/print` }),
 };
 
@@ -216,7 +215,11 @@ export const dashboardApi = {
 export const userApi = {
   list: (filters: Record<string, unknown> = {}) =>
     requestPaginated<User>({ url: '/users', params: clean(filters) }),
-  get: (id: string) => request<User>({ url: `/users/${id}` }),
+  // The API wraps the record as `{ user, permissions }` — unwrap to the User the
+  // callers (and this type) actually expect. Without this, the detail page read
+  // `.name` off the envelope and crashed on `undefined.split(' ')`.
+  get: (id: string) =>
+    request<{ user: User; permissions: string[] }>({ url: `/users/${id}` }).then((r) => r.user),
   lookup: () => request<Pick<User, '_id' | 'name' | 'employeeId'>[]>({ url: '/users/lookup' }),
   managers: () => request<Pick<User, '_id' | 'name' | 'employeeId'>[]>({ url: '/users/managers' }),
   reportees: (id: string) => request<User[]>({ url: `/users/${id}/reportees` }),
@@ -234,6 +237,35 @@ export const userApi = {
       data,
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+
+  /** Validates the file and reports what WOULD happen; writes nothing. */
+  importPreview: (file: File) => {
+    const data = new FormData();
+    data.append('file', file);
+    data.append('dryRun', 'true');
+    return request<UserImportSummary>({
+      url: '/users/import',
+      method: 'POST',
+      data,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  /** Commits the import. `skipInvalid` imports the good rows and drops the bad. */
+  importCommit: (file: File, skipInvalid: boolean) => {
+    const data = new FormData();
+    data.append('file', file);
+    if (skipInvalid) data.append('skipInvalid', 'true');
+    return request<UserImportSummary>({
+      url: '/users/import',
+      method: 'POST',
+      data,
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+
+  importTemplate: () =>
+    api.get('/users/import/template', { responseType: 'blob' }).then((response) => response.data),
   setStatus: (id: string, status: User['status']) =>
     request<User>({ url: `/users/${id}/status`, method: 'PATCH', data: { status } }),
   resetPassword: (id: string, password: string) =>

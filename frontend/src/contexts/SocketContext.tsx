@@ -26,12 +26,24 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const { isAuthenticated, user } = useAuth();
   const queryClient = useQueryClient();
   const [isConnected, setIsConnected] = useState(false);
+  const [socket, setSocket] = useState<Socket | null>(null);
   const socketRef = useRef<Socket | null>(null);
 
+  /* Keyed on the user IDENTITY, not the user OBJECT.
+   *
+   * This effect used to depend on `user`, which AuthContext replaces with a new
+   * object on every refreshUser()/profile save. Each of those tore down a
+   * perfectly healthy WebSocket and opened a fresh one — reconnect churn that
+   * re-registered every handler and re-fired the invalidations below, which is a
+   * large part of why API calls appeared to fire several times over.
+   * Only a genuine change of *who is signed in* should rebuild the connection. */
+  const userId = user?._id ?? null;
+
   useEffect(() => {
-    if (!isAuthenticated || !user) {
+    if (!isAuthenticated || !userId) {
       socketRef.current?.disconnect();
       socketRef.current = null;
+      setSocket(null);
       setIsConnected(false);
       return undefined;
     }
@@ -44,6 +56,9 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     });
 
     socketRef.current = socket;
+    // Held in state as well as a ref: the context value must change identity when
+    // the socket is replaced, or consumers keep a dead one.
+    setSocket(socket);
 
     socket.on('connect', () => setIsConnected(true));
     socket.on('disconnect', () => setIsConnected(false));
@@ -88,13 +103,17 @@ export const SocketProvider = ({ children }: { children: ReactNode }) => {
     });
 
     return () => {
+      // removeAllListeners before disconnect: socket.io retains handler arrays on
+      // the instance, and the closures here capture queryClient. Without this the
+      // old instance stays reachable from its own listeners after a reconnect.
+      socket.removeAllListeners();
       socket.disconnect();
       socketRef.current = null;
       setIsConnected(false);
     };
-  }, [isAuthenticated, user, queryClient]);
+  }, [isAuthenticated, userId, queryClient]);
 
-  const value = useMemo(() => ({ socket: socketRef.current, isConnected }), [isConnected]);
+  const value = useMemo(() => ({ socket, isConnected }), [socket, isConnected]);
 
   return <SocketContext.Provider value={value}>{children}</SocketContext.Provider>;
 };

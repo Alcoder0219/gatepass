@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { memo, useEffect, useRef, type ReactNode } from 'react';
 import { motion, useInView } from 'framer-motion';
 import { TrendingDown, TrendingUp } from 'lucide-react';
 import { cn } from '@/utils/cn';
@@ -15,37 +15,70 @@ const TONES: Record<Tone, { icon: string; glow: string; bar: string }> = {
   info: { icon: 'bg-info-500/15 text-info-500', glow: 'from-info-500/20', bar: 'bg-info-500' },
 };
 
-/** Counts up to the value once the card scrolls into view. */
+const format = (n: number) => n.toLocaleString('en-IN');
+
+/**
+ * Counts up to the value once the card scrolls into view.
+ *
+ * The animation writes straight to the DOM node rather than through state. It
+ * used to `setValue()` inside the rAF loop, which re-rendered the whole card on
+ * every frame — ~54 renders per card, and a dashboard shows six of them. The
+ * number on screen is identical; it just no longer drags React through 900ms of
+ * reconciliation to draw it.
+ *
+ * It also animates FROM the previous value now. Keying the effect on `target`
+ * meant any background refetch that nudged a count snapped it to 0 and re-ran
+ * the whole climb, which is why idle dashboards visibly twitched.
+ */
 const useCountUp = (target: number, duration = 900) => {
-  const [value, setValue] = useState(0);
   const ref = useRef<HTMLDivElement>(null);
+  const numberRef = useRef<HTMLParagraphElement>(null);
+  const from = useRef(0);
   const inView = useInView(ref, { once: true, margin: '-40px' });
 
   useEffect(() => {
-    if (!inView) return undefined;
+    const node = numberRef.current;
+    if (!node) return undefined;
+
+    if (!inView) {
+      node.textContent = format(0);
+      return undefined;
+    }
+
+    const start = from.current;
+    const delta = target - start;
+
+    const settle = () => {
+      node.textContent = format(target);
+      from.current = target;
+    };
 
     // Respect reduced motion — snap straight to the number.
-    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
-      setValue(target);
+    if (delta === 0 || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      settle();
       return undefined;
     }
 
     let frame = 0;
-    const start = performance.now();
+    const began = performance.now();
 
     const tick = (now: number) => {
-      const progress = Math.min((now - start) / duration, 1);
+      const progress = Math.min((now - began) / duration, 1);
       // easeOutExpo — fast start, gentle landing.
       const eased = progress === 1 ? 1 : 1 - 2 ** (-10 * progress);
-      setValue(Math.round(target * eased));
-      if (progress < 1) frame = requestAnimationFrame(tick);
+      node.textContent = format(Math.round(start + delta * eased));
+      if (progress < 1) {
+        frame = requestAnimationFrame(tick);
+      } else {
+        settle();
+      }
     };
 
     frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(frame);
   }, [inView, target, duration]);
 
-  return { value, ref };
+  return { ref, numberRef };
 };
 
 export interface StatCardProps {
@@ -61,7 +94,7 @@ export interface StatCardProps {
   progress?: number;
 }
 
-export const StatCard = ({
+const StatCardInner = ({
   label,
   value,
   icon,
@@ -71,7 +104,7 @@ export const StatCard = ({
   onClick,
   progress,
 }: StatCardProps) => {
-  const { value: displayed, ref } = useCountUp(value);
+  const { ref, numberRef } = useCountUp(value);
   const palette = TONES[tone];
   const positive = (trend ?? 0) >= 0;
 
@@ -101,8 +134,12 @@ export const StatCard = ({
             {label}
           </p>
 
-          <p className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-content">
-            {displayed.toLocaleString('en-IN')}
+          {/* Written by useCountUp via ref — see the note there. */}
+          <p
+            ref={numberRef}
+            className="mt-2 text-3xl font-bold tabular-nums tracking-tight text-content"
+          >
+            {format(value)}
           </p>
 
           <div className="mt-2 flex items-center gap-2">
@@ -214,5 +251,10 @@ export const ProgressRing = ({
     </div>
   );
 };
+
+
+/* Memoized: a dashboard renders six of these, and every one of them used to
+ * re-render whenever any unrelated page state changed. */
+export const StatCard = memo(StatCardInner);
 
 export default StatCard;

@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Clock, FileText } from 'lucide-react';
 import { DataTable, StatusBadge, TypeBadge, Avatar, type Column } from '@/components/ui';
@@ -43,7 +44,10 @@ export const GatePassTable = ({
 }: GatePassTableProps) => {
   const navigate = useNavigate();
 
-  const columns: Column<GatePass>[] = [
+  /* These four props feed a memoized row. Rebuilt inline (as they were), each one
+   * arrives with a fresh identity on every render and the memo never hits — so
+   * every keystroke in a parent's search box re-rendered all 20 rows. */
+  const columns: Column<GatePass>[] = useMemo(() => [
     {
       key: 'gatePassNumber',
       header: 'Gate Pass',
@@ -133,23 +137,17 @@ export const GatePassTable = ({
     },
 
     ...(actionColumn ? [actionColumn] : []),
-  ];
+  ], [hideEmployee, actionColumn]);
 
-  return (
-    <DataTable
-      data={data}
-      columns={columns}
-      isLoading={isLoading}
-      rowKey={(row) => row._id}
-      onRowClick={(row) => navigate(`${basePath}/${row._id}`)}
-      meta={meta}
-      onPageChange={onPageChange}
-      sort={sort}
-      onSortChange={onSortChange}
-      emptyTitle={emptyTitle}
-      emptyMessage={emptyMessage}
-      emptyAction={emptyAction}
-      mobileCard={(row) => (
+  const rowKey = useCallback((row: GatePass) => row._id, []);
+  const onRowClick = useCallback(
+    (row: GatePass) => navigate(`${basePath}/${row._id}`),
+    [navigate, basePath]
+  );
+
+  const mobileCard = useCallback(
+    (row: GatePass) => (
+
         <div className="card card-hover p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2.5">
@@ -179,7 +177,25 @@ export const GatePassTable = ({
             </p>
           </div>
         </div>
-      )}
+    ),
+    [hideEmployee]
+  );
+
+  return (
+    <DataTable
+      data={data}
+      columns={columns}
+      isLoading={isLoading}
+      rowKey={rowKey}
+      onRowClick={onRowClick}
+      meta={meta}
+      onPageChange={onPageChange}
+      sort={sort}
+      onSortChange={onSortChange}
+      emptyTitle={emptyTitle}
+      emptyMessage={emptyMessage}
+      emptyAction={emptyAction}
+      mobileCard={mobileCard}
     />
   );
 };

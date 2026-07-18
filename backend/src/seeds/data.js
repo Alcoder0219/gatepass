@@ -451,7 +451,7 @@ export const TYPES = [GATEPASS_TYPE.OFFICIAL, GATEPASS_TYPE.PERSONAL];
 /* ─── Settings singleton ──────────────────────────────────────────────────── */
 export const SETTINGS = {
   company: {
-    name: 'Amson Group',
+    name: 'Amsons Group',
     logo: 'https://i.postimg.cc/Mq6kj4FN/AMSONS-GROUP-LOGO-MASTER-(1).png',
     email: 'facilities@amsongroup.com',
     phone: '+91 124 400 0000',

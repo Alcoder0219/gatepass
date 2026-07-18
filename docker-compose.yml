@@ -41,7 +41,7 @@ services:
       SMTP_PORT: ${SMTP_PORT:-587}
       SMTP_USER: ${SMTP_USER:-}
       SMTP_PASS: ${SMTP_PASS:-}
-      MAIL_FROM: ${MAIL_FROM:-Amson Group <no-reply@amsongroup.com>}
+      MAIL_FROM: ${MAIL_FROM:-Amsons Group <no-reply@amsongroup.com>}
 
       BCRYPT_SALT_ROUNDS: 12
       RATE_LIMIT_WINDOW_MINUTES: 15
@@ -68,10 +68,20 @@ services:
         VITE_API_URL: ${VITE_API_URL:-/api/v1}
     container_name: gatepass-web
     restart: unless-stopped
+    environment:
+      # nginx listens on PORT and proxies /api,/uploads,/socket.io to API_UPSTREAM.
+      PORT: '80'
+      API_UPSTREAM: api:5000
     depends_on:
       - api
     ports:
       - '8080:80'
+    healthcheck:
+      test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:80/healthz']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
 
 volumes:
   uploads:

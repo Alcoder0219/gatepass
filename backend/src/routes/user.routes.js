@@ -3,7 +3,7 @@ import { Router } from 'express';
 import { authenticate } from '../middlewares/auth.middleware.js';
 import { authorize } from '../middlewares/rbac.middleware.js';
 import validate from '../middlewares/validate.middleware.js';
-import { uploadAvatar } from '../middlewares/upload.middleware.js';
+import { uploadAvatar, uploadCsv } from '../middlewares/upload.middleware.js';
 import * as userController from '../controllers/user.controller.js';
 import {
   idParamSchema,
@@ -30,6 +30,21 @@ router.get(
   authorize(PERMISSION.USERS_VIEW),
   validate({ query: listUsersQuerySchema }),
   userController.listUsers
+);
+
+/* Bulk import. Declared ahead of `/:id` — Express matches in order, and
+ * `/users/import` would otherwise be swallowed as an id param. */
+router.get(
+  '/import/template',
+  authorize(PERMISSION.USERS_CREATE),
+  userController.downloadImportTemplate
+);
+
+router.post(
+  '/import',
+  authorize(PERMISSION.USERS_CREATE),
+  uploadCsv,
+  userController.bulkImportUsers
 );
 
 router.post(

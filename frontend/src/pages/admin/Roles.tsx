@@ -207,12 +207,30 @@ const Roles = () => {
     [roles, selectedId]
   );
 
+  /* O(1) membership. The permission grid asked `draft.permissions.includes(key)`
+   * for every key in every group, and again for every Switch — a linear scan of
+   * the permission array thousands of times per render, on every keystroke. */
+  const selectedPermissions = useMemo(
+    () => new Set(draft?.permissions ?? []),
+    [draft?.permissions]
+  );
+
   const isDirty = useMemo(() => {
     if (!draft) return false;
     if (isNew) return true;
     if (!original) return false;
-    return JSON.stringify(draft) !== JSON.stringify(toDraft(original));
-  }, [draft, original, isNew]);
+
+    /* Was: JSON.stringify(draft) !== JSON.stringify(toDraft(original)) — two full
+     * serializations of the role, permission array and all, on every keystroke in
+     * the name field. Compare the fields structurally instead; permissions are
+     * compared by size then membership against the Set we already built. */
+    const base = toDraft(original);
+    if (draft.name !== base.name) return true;
+    if (draft.description !== base.description) return true;
+    if (draft.level !== base.level) return true;
+    if (draft.permissions.length !== base.permissions.length) return true;
+    return base.permissions.some((key) => !selectedPermissions.has(key));
+  }, [draft, original, isNew, selectedPermissions]);
 
   const allPermissions = useMemo(
     () => groups.flatMap((group) => group.permissions),
@@ -684,7 +702,7 @@ const Roles = () => {
                   <div className="space-y-3">
                     {groups.map((group) => {
                       const keys = group.permissions.map((permission) => permission.key);
-                      const enabled = keys.filter((key) => draft.permissions.includes(key));
+                      const enabled = keys.filter((key) => selectedPermissions.has(key));
                       const all = enabled.length === keys.length && keys.length > 0;
                       const partial = enabled.length > 0 && !all;
                       const isCollapsed = collapsed.includes(group.group);
@@ -754,7 +772,7 @@ const Roles = () => {
                                       label={permission.label}
                                       description={permission.description}
                                       disabled={!canManage}
-                                      checked={draft.permissions.includes(permission.key)}
+                                      checked={selectedPermissions.has(permission.key)}
                                       onChange={() =>
                                         patch({
                                           permissions: toggle(draft.permissions, permission.key),

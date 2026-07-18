@@ -15,6 +15,7 @@ import notificationRoutes from './notification.routes.js';
 import auditRoutes from './audit.routes.js';
 import settingsRoutes from './settings.routes.js';
 import searchRoutes from './search.routes.js';
+import logger from '../utils/logger.js';
 
 const router = Router();
 
@@ -32,6 +33,20 @@ router.get('/', (_req, res) =>
     },
   })
 );
+
+/* Client render-error telemetry. Temporary diagnostic: the frontend error
+ * boundary POSTs here when a route fails to render, so a crash we cannot
+ * reproduce server-side still lands in the API logs. No auth — an unrenderable
+ * page often means the session is not usable — and it only ever logs. */
+router.post('/client-errors', (req, res) => {
+  const { message, stack, url, userAgent } = req.body ?? {};
+  logger.warn(
+    `CLIENT ERROR | ${String(url || '').slice(0, 200)} | ${String(message || '').slice(0, 500)}\n` +
+      `${String(stack || '').slice(0, 1500)}\n` +
+      `UA: ${String(userAgent || '').slice(0, 200)}`
+  );
+  res.status(204).end();
+});
 
 router.use('/auth', authRoutes);
 router.use('/users', userRoutes);

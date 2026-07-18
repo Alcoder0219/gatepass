@@ -28,11 +28,7 @@ import {
   Holiday,
   Counter,
 } from '../models/index.js';
-import {
-  generateGatePassNumber,
-  generateQrToken,
-  generateQrCode,
-} from '../helpers/gatePassNumber.js';
+import { generateGatePassNumber } from '../helpers/gatePassNumber.js';
 import { dayjs } from '../utils/dates.js';
 import {
   GATEPASS_STATUS,
@@ -490,8 +486,6 @@ const seedGatePasses = async (units, departments, users) => {
           updatedAt: hrReviewedAt,
         });
 
-        pass.qrToken = generateQrToken();
-        pass.qrCode = await generateQrCode({ gatePassNumber, qrToken: pass.qrToken });
         pass.expiresAt = dayjs(expectedInTime).add(24, 'hour').toDate();
         pass.updatedAt = hrReviewedAt;
       }
@@ -527,7 +521,7 @@ const seedGatePasses = async (units, departments, users) => {
           recordedByName: security.name,
           recordedAt: actualOutTime,
           remark: 'ID card verified at the main gate.',
-          verificationMethod: 'QR',
+          verificationMethod: 'MANUAL',
           unit: unit._id,
           gate: 'MAIN',
           createdAt: actualOutTime,
@@ -573,7 +567,7 @@ const seedGatePasses = async (units, departments, users) => {
             recordedByName: security.name,
             recordedAt: actualInTime,
             remark: pass.security.entryRemark,
-            verificationMethod: 'QR',
+            verificationMethod: 'MANUAL',
             unit: unit._id,
             gate: 'MAIN',
             isLate: pass.isLate,

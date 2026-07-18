@@ -61,6 +61,25 @@ export const uploadSecurityPhoto = multer({
   fileFilter: fileFilter(ALLOWED.image),
 }).single('photo');
 
+/**
+ * The bulk user import. Memory storage, deliberately: the CSV is parsed once and
+ * thrown away, so writing a staff list — names, emails, phone numbers — to the
+ * uploads volume would leave PII on disk for no reason.
+ *
+ * Excel is inconsistent about what it labels a .csv, hence the spread of types.
+ */
+export const uploadCsv = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: fileFilter([
+    'text/csv',
+    'text/plain',
+    'application/csv',
+    'application/vnd.ms-excel',
+    'application/octet-stream',
+  ]),
+}).single('file');
+
 /** Maps a multer file to the public URL served by `/uploads`. */
 export const toPublicUrl = (file, folder) =>
   file ? `/${env.upload.dir}/${folder}/${file.filename}` : '';

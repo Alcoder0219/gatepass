@@ -277,7 +277,7 @@ export const CONTENT_TYPES = {
 /* ── Excel ── */
 
 /** Styled, frozen-header workbook streamed straight into the response. */
-export const buildExcel = async (rows, { companyName = 'Amson Group', generatedBy = '' } = {}) => {
+export const buildExcel = async (rows, { companyName = 'Amsons Group', generatedBy = '' } = {}) => {
   const workbook = new ExcelJS.Workbook();
   workbook.creator = companyName;
   workbook.created = new Date();
@@ -362,7 +362,7 @@ export const buildCsv = (rows) => {
  * document is piped into `stream` (the response) before anything is written, so
  * the file streams out instead of being buffered whole in memory.
  */
-export const buildPdf = (rows, { companyName = 'Amson Group', generatedBy = '', filters = {}, stream = null } = {}) => {
+export const buildPdf = (rows, { companyName = 'Amsons Group', generatedBy = '', filters = {}, stream = null } = {}) => {
   const doc = new PDFDocument({ size: 'A4', layout: 'landscape', margin: 28, bufferPages: true });
   if (stream) doc.pipe(stream);
 
@@ -455,7 +455,7 @@ export const buildPdf = (rows, { companyName = 'Amson Group', generatedBy = '', 
 /** Resolves the company name once so every writer stamps the same header. */
 export const getExportBranding = async () => {
   const settings = await getSettings();
-  return { companyName: settings?.company?.name || 'Amson Group' };
+  return { companyName: settings?.company?.name || 'Amsons Group' };
 };
 
 export default {

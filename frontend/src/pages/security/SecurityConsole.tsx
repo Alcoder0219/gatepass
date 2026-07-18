@@ -11,7 +11,6 @@ import {
   History,
   LogIn,
   LogOut,
-  ScanLine,
   Search,
   ShieldAlert,
   ShieldCheck,
@@ -19,7 +18,6 @@ import {
 } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
 import { GatePassTable } from '@/components/gatepass/GatePassTable';
-import { QRScanner } from '@/components/security/QRScanner';
 import {
   Avatar,
   Badge,
@@ -98,11 +96,9 @@ const SecurityConsole = () => {
   const { can } = usePermissions();
   const canExit = can(PERMISSION.SECURITY_MARK_EXIT);
   const canReturn = can(PERMISSION.SECURITY_MARK_RETURN);
-  const canScan = can(PERMISSION.SECURITY_SCAN);
 
   const [tab, setTab] = useState<'queue' | 'out' | 'history'>('queue');
   const [page, setPage] = useState(1);
-  const [scannerOpen, setScannerOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
 
   const [result, setResult] = useState<{
@@ -116,6 +112,19 @@ const SecurityConsole = () => {
   const [photo, setPhoto] = useState<File | null>(null);
   const [done, setDone] = useState<GateAction | null>(null);
   const photoInputRef = useRef<HTMLInputElement>(null);
+
+  /* The success panel auto-dismisses 1.6s after a gate movement. That timer used
+   * to be fire-and-forget: a guard who confirms an exit and immediately taps
+   * another page left it running, and it then setState'd into an unmounted tree.
+   * Tracked here so unmount can cancel it. */
+  const dismissTimer = useRef<number | null>(null);
+
+  useEffect(
+    () => () => {
+      if (dismissTimer.current !== null) window.clearTimeout(dismissTimer.current);
+    },
+    []
+  );
 
   const switchTab = (value: string) => {
     setTab(value as 'queue' | 'out' | 'history');
@@ -157,7 +166,6 @@ const SecurityConsole = () => {
   const verify = (code: string, method: Method) => {
     const trimmed = code.trim();
     if (trimmed.length < 3) return;
-    setScannerOpen(false);
     verifyMutation.mutate({ code: trimmed, method });
   };
 
@@ -190,7 +198,11 @@ const SecurityConsole = () => {
       void queryClient.invalidateQueries({ queryKey: ['dashboard'] });
       setDone(variables.action);
       setManualCode('');
-      window.setTimeout(closeAction, 1600);
+      if (dismissTimer.current !== null) window.clearTimeout(dismissTimer.current);
+      dismissTimer.current = window.setTimeout(() => {
+        dismissTimer.current = null;
+        closeAction();
+      }, 1600);
     },
     // A 400 here is usually "a photo is required to record the exit" — the
     // server's message is the instruction, so it goes straight to the guard.
@@ -367,20 +379,8 @@ const SecurityConsole = () => {
         breadcrumbs={[{ label: 'Workflow' }, { label: 'Security' }]}
       />
 
-      {/* ── Scan + manual search: the two ways in, both huge ─────────────── */}
+      {/* ── Verify a gate pass by number or employee code ────────────────── */}
       <div className="card mb-6 flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:p-5">
-        {canScan && (
-          <Button
-            size="lg"
-            fullWidth
-            className="h-16 text-lg sm:h-14 sm:w-auto sm:min-w-[220px]"
-            leftIcon={<ScanLine className="h-6 w-6" />}
-            onClick={() => setScannerOpen(true)}
-          >
-            Scan QR
-          </Button>
-        )}
-
         <form
           onSubmit={(event) => {
             event.preventDefault();
@@ -562,13 +562,6 @@ const SecurityConsole = () => {
           )}
         />
       )}
-
-      {/* ── Scanner ──────────────────────────────────────────────────────── */}
-      <QRScanner
-        isOpen={scannerOpen}
-        onClose={() => setScannerOpen(false)}
-        onScan={(code) => verify(code, 'QR')}
-      />
 
       {/* ── Verification result — the one-second decision ─────────────────── */}
       <Modal

@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
   AlertTriangle,
@@ -14,7 +13,6 @@ import {
   MessageSquare,
   Pencil,
   Printer,
-  QrCode,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -255,7 +253,6 @@ const GatePassDetail = () => {
   const hasActions =
     canDecide || canHrReview || canMarkExit || canMarkReturn || canCancel || canEdit || canDelete;
 
-  const qrVisible = ['APPROVED', 'OUT', 'COMPLETED'].includes(status) && Boolean(gatePass.qrCode);
   const scanned = Boolean(gatePass.security?.actualOutTime || gatePass.security?.actualInTime);
 
   const plannedMinutes = minutesBetween(gatePass.expectedOutTime, gatePass.expectedInTime);
@@ -584,33 +581,8 @@ const GatePassDetail = () => {
           )}
         </div>
 
-        {/* ── Right: QR + timeline + actions ──────────────────────────────── */}
+        {/* ── Right: timeline + actions ───────────────────────────────────── */}
         <div className="space-y-6">
-          {qrVisible && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.96 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="card overflow-hidden p-0"
-            >
-              {/* The QR sits on plain white regardless of theme — a dark surface
-                  behind a QR is a scanner failure waiting to happen. */}
-              <div className="flex flex-col items-center bg-white p-6">
-                <img
-                  src={gatePass.qrCode}
-                  alt={`QR code for ${gatePass.gatePassNumber}`}
-                  className="h-48 w-48"
-                />
-                <p className="mt-3 font-mono text-sm font-bold text-slate-900">
-                  {gatePass.gatePassNumber}
-                </p>
-              </div>
-              <div className="flex items-center justify-center gap-2 px-4 py-3 text-xs text-content-muted">
-                <QrCode className="h-3.5 w-3.5" />
-                Show this at the gate
-              </div>
-            </motion.div>
-          )}
-
           {/* Desktop action card. */}
           {hasActions && (
             <Card className="hidden lg:block">

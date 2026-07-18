@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Suspense, useCallback, useState } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
@@ -6,6 +6,9 @@ import { gatePassApi, hrApi, notificationApi, securityApi } from '@/services/end
 import { usePermissions } from '@/permissions/usePermissions';
 import { PERMISSION } from '@/permissions/constants';
 import { pageVariants } from '@/animations/variants';
+import { PageSkeleton } from '@/components/common/PageSkeleton';
+import { RouteErrorBoundary } from '@/components/common/RouteErrorBoundary';
+import { useScrollRestoration } from '@/hooks/useScrollRestoration';
 import { Sidebar } from './Sidebar';
 import { Topbar } from './Topbar';
 import { cn } from '@/utils/cn';
@@ -56,14 +59,20 @@ export const DashboardLayout = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const location = useLocation();
   const badges = useSidebarBadges();
+  useScrollRestoration();
 
-  const toggleCollapse = () => {
-    setCollapsed((current) => {
+  /* Stable identities: Sidebar and Topbar are memoized, and a fresh arrow on
+   * every render would defeat that — they re-rendered on each badge poll. */
+  const toggleCollapse = useCallback(() => {
+    setCollapsed((current: boolean) => {
       const next = !current;
       localStorage.setItem('gatepass.sidebar', next ? 'collapsed' : 'expanded');
       return next;
     });
-  };
+  }, []);
+
+  const closeMobile = useCallback(() => setMobileOpen(false), []);
+  const openMobile = useCallback(() => setMobileOpen(true), []);
 
   return (
     <div className="min-h-dvh">
@@ -71,7 +80,7 @@ export const DashboardLayout = () => {
         collapsed={collapsed}
         onToggleCollapse={toggleCollapse}
         mobileOpen={mobileOpen}
-        onCloseMobile={() => setMobileOpen(false)}
+        onCloseMobile={closeMobile}
         badges={badges}
       />
 
@@ -81,22 +90,41 @@ export const DashboardLayout = () => {
           collapsed ? 'lg:pl-[76px]' : 'lg:pl-[264px]'
         )}
       >
-        <Topbar onOpenMobileMenu={() => setMobileOpen(true)} />
+        <Topbar onOpenMobileMenu={openMobile} />
 
         <main className="flex-1 px-4 py-6 pb-safe sm:px-6 lg:px-8">
-          {/* Keyed on the pathname so every navigation is a fresh enter/exit. */}
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={location.pathname}
-              variants={pageVariants}
-              initial="initial"
-              animate="animate"
-              exit="exit"
-              className="mx-auto w-full max-w-[1600px]"
-            >
-              <Outlet />
-            </motion.div>
-          </AnimatePresence>
+          {/* Suspense sits ABOVE AnimatePresence, and this is load-bearing.
+           *
+           * Every page below is lazy(). When Suspense lived *inside* the keyed
+           * child (via the route guard), an incoming chunk would suspend while
+           * AnimatePresence — in mode="wait" — was still holding the outgoing
+           * child for its exit animation. React discards a suspended subtree, so
+           * the exit-complete callback never fired, AnimatePresence dropped both
+           * children, and the content area rendered nothing: the blank page you
+           * hit when clicking through the sidebar quickly.
+           *
+           * Hoisted here, a suspending chunk swaps the whole presence tree for
+           * the skeleton and remounts cleanly on resolve. Exit animations now
+           * only ever run on already-loaded content, which is the one case
+           * mode="wait" actually handles correctly. Do not push this back down. */}
+          <Suspense fallback={<div className="mx-auto w-full max-w-[1600px]"><PageSkeleton /></div>}>
+            <AnimatePresence mode="wait" initial={false}>
+              <motion.div
+                key={location.pathname}
+                variants={pageVariants}
+                initial="initial"
+                animate="animate"
+                exit="exit"
+                className="mx-auto w-full max-w-[1600px]"
+              >
+                {/* Remounts with the keyed child, so a crash on one page never
+                 * outlives the navigation away from it. */}
+                <RouteErrorBoundary>
+                  <Outlet />
+                </RouteErrorBoundary>
+              </motion.div>
+            </AnimatePresence>
+          </Suspense>
         </main>
       </div>
     </div>

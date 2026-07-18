@@ -10,3 +10,6 @@ backend/uploads/
 .DS_Store
 .vscode/
 coverage/
+
+# Personal Claude Code settings
+.claude/settings.local.json

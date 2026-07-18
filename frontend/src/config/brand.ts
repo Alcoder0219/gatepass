@@ -4,8 +4,8 @@
  * follows. Nothing else should hardcode the brand.
  */
 export const BRAND = {
-  name: 'Amson Group',
-  shortName: 'Amson',
+  name: 'Amsons Group',
+  shortName: 'Amsons',
   tagline: 'Enterprise Gate Pass Management',
   /** Served from frontend/public — self-hosted, no external dependency at runtime. */
   logo: '/amson-logo.png',

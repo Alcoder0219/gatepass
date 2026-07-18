@@ -1,0 +1,27 @@
+# Dependencies — reinstalled inside the image with `npm ci`
+node_modules
+npm-debug.log*
+
+# Secrets & local config — env comes ONLY from Docker/Cloud Run at runtime
+.env
+.env.*
+!.env.example
+
+# Runtime artifacts that must never bake into the image
+uploads
+src/logs
+logs
+*.log
+
+# VCS / tooling / editor noise
+.git
+.gitignore
+.dockerignore
+Dockerfile
+.vscode
+.idea
+.DS_Store
+
+# Tests & docs — not needed to run the API
+coverage
+*.md

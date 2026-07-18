@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import { cn } from '@/utils/cn';
 import { assetUrl, initialsOf } from '@/utils/format';
 
@@ -27,7 +27,7 @@ const gradientFor = (seed: string) => {
   return GRADIENTS[hash % GRADIENTS.length];
 };
 
-export const Avatar = ({
+const AvatarInner = ({
   src,
   name,
   size = 'md',
@@ -89,6 +89,10 @@ export const Avatar = ({
 };
 
 /** Overlapping avatar row with a "+n" overflow chip. */
+/* Rendered once per table row; gradientFor() is a char-by-char reduce over the
+ * name, and it re-ran for every row on every parent render. */
+export const Avatar = memo(AvatarInner);
+
 export const AvatarGroup = ({
   people,
   max = 4,

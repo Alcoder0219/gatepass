@@ -9,11 +9,7 @@ import { getSettings, assertCanCreateGatePass } from './settings.service.js';
 import { notify, notifyRole } from './notification.service.js';
 import { recordAudit } from './audit.service.js';
 import { emitToRole, emitToUser, emitToAll } from './socket.service.js';
-import {
-  generateGatePassNumber,
-  generateQrCode,
-  generateQrToken,
-} from '../helpers/gatePassNumber.js';
+import { generateGatePassNumber } from '../helpers/gatePassNumber.js';
 import {
   GATEPASS_STATUS,
   GATEPASS_TYPE,
@@ -38,17 +34,6 @@ const assertTransition = (from, to) => {
         .replace('_', ' ')}`
     );
   }
-};
-
-/** Mints the QR the moment a pass becomes APPROVED (and only then). */
-const attachQr = async (gatePass) => {
-  const settings = await getSettings();
-  if (!settings.security.qrEnabled) return gatePass;
-  if (gatePass.qrCode) return gatePass;
-
-  gatePass.qrToken = generateQrToken();
-  gatePass.qrCode = await generateQrCode(gatePass);
-  return gatePass;
 };
 
 /* ────────────────────────────────────────────────────────────────────────────
@@ -114,7 +99,6 @@ export const createGatePass = async (user, payload, { req, attachments = [] } = 
   if (!settings.workflow.approvalRequired) {
     gatePass.status = GATEPASS_STATUS.APPROVED;
     gatePass.stage = WORKFLOW_STAGE.SECURITY;
-    await attachQr(gatePass);
   } else {
     gatePass.status = GATEPASS_STATUS.PENDING;
     gatePass.stage = WORKFLOW_STAGE.MANAGER;
@@ -206,8 +190,6 @@ export const approveGatePass = async (user, gatePass, { comment = '', req } = {}
 
   if (needsHr) {
     gatePass.hrReview.status = 'PENDING';
-  } else {
-    await attachQr(gatePass);
   }
 
   gatePass.pushTimeline({
@@ -479,8 +461,6 @@ export const reviewGatePass = async (user, gatePass, { status, comment = '', req
     comment,
   };
   gatePass.updatedBy = user._id;
-
-  if (isOk) await attachQr(gatePass);
 
   gatePass.pushTimeline({
     action: isOk ? 'HR_REVIEW_OK' : 'HR_REVIEW_NOT_OK',
@@ -770,7 +750,7 @@ async function notifyEmployeeApproved(gatePass, actor) {
     actor,
     type: NOTIFICATION_TYPE.APPROVAL,
     title: 'Gate pass approved',
-    message: `${gatePass.gatePassNumber} is approved — show the QR code at the gate`,
+    message: `${gatePass.gatePassNumber} is approved — you can now use it at the gate`,
     link: `/my-gate-pass/${gatePass._id}`,
     gatePass,
     email: true,

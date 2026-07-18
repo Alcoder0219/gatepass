@@ -393,7 +393,7 @@ const Profile = () => {
                   <Input
                     label="Phone"
                     type="tel"
-                    placeholder="+91 98765 43210"
+                    placeholder="+255 712345678"
                     leftIcon={<Phone className="h-4 w-4" />}
                     error={profileForm.formState.errors.phone?.message}
                     {...profileForm.register('phone')}

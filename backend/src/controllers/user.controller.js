@@ -9,6 +9,8 @@ import { recordAudit, diff } from '../services/audit.service.js';
 import { sendTemplate } from '../services/email.service.js';
 import { buildUserScope } from '../services/scope.service.js';
 import { toPublicUrl } from '../middlewares/upload.middleware.js';
+import { parseCsv, validateRows, importUsers, templateCsv } from '../services/userImport.service.js';
+import { invalidateUser } from '../utils/authCache.js';
 import { AUDIT_ACTION, ROLE } from '../constants/index.js';
 
 const POPULATE = [
@@ -151,13 +153,14 @@ export const createUser = asyncHandler(async (req, res) => {
     updatedBy: req.user._id,
   });
 
-  await sendTemplate('welcome', {
+  // Best-effort: a slow/unreachable SMTP server must not hold the response open.
+  void sendTemplate('welcome', {
     to: user.email,
     name: user.name,
     email: user.email,
     password: generated ?? '(the password chosen by your administrator)',
     loginUrl: `${env.clientUrl}/login`,
-  });
+  }).catch(() => {});
 
   await recordAudit({
     action: AUDIT_ACTION.USER_CREATE,
@@ -173,6 +176,85 @@ export const createUser = asyncHandler(async (req, res) => {
   await user.populate(POPULATE);
 
   return sendCreated(res, { data: user.toJSON(), message: 'User created successfully' });
+});
+
+/* ─── Bulk import ─────────────────────────────────────────────────────────────
+ * Two endpoints, one code path. The UI calls this first with dryRun=true to show
+ * the administrator exactly what will happen, then again to commit — so the
+ * validation that gates the write is the same validation they were shown, rather
+ * than a preview that might disagree with it.
+ * ────────────────────────────────────────────────────────────────────────── */
+
+export const downloadImportTemplate = asyncHandler(async (_req, res) => {
+  res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+  res.setHeader('Content-Disposition', 'attachment; filename="gatepass-users-template.csv"');
+  return res.send(templateCsv());
+});
+
+export const bulkImportUsers = asyncHandler(async (req, res) => {
+  if (!req.file) throw ApiError.badRequest('Attach a CSV file in the `file` field.');
+
+  const dryRun = req.body?.dryRun === 'true' || req.body?.dryRun === true;
+  const skipInvalid = req.body?.skipInvalid === 'true' || req.body?.skipInvalid === true;
+
+  const records = parseCsv(req.file.buffer);
+  if (records.length > 500) {
+    throw ApiError.badRequest(
+      `That file has ${records.length} rows. Import at most 500 at a time.`
+    );
+  }
+
+  const results = await validateRows(records);
+  const summary = await importUsers(results, { dryRun, skipInvalid, actor: req.user });
+
+  if (summary.refused) {
+    throw ApiError.badRequest(
+      `${summary.invalid} of ${summary.total} rows have errors, so nothing was imported. ` +
+        'Fix the file, or re-run allowing invalid rows to be skipped.',
+      summary.rows.filter((row) => !row.valid).flatMap((row) =>
+        row.errors.map((error) => ({ field: `row ${row.line}: ${error.field}`, message: error.message }))
+      )
+    );
+  }
+
+  if (dryRun) {
+    return sendSuccess(res, {
+      data: summary,
+      message: `${summary.valid} of ${summary.total} rows are ready to import`,
+    });
+  }
+
+  await recordAudit({
+    action: AUDIT_ACTION.USER_CREATE,
+    actor: req.user,
+    entity: 'User',
+    entityLabel: 'BULK_IMPORT',
+    description: `Bulk imported ${summary.created} user(s) from CSV`,
+    req,
+  });
+
+  /* Welcome emails are best-effort and deliberately not awaited as a group with
+   * the response: a slow SMTP server should not hold up (or fail) an import that
+   * has already been written. The generated passwords are also returned to the
+   * administrator, which is the only reliable channel when SMTP is unconfigured. */
+  summary.credentials
+    .filter((credential) => credential.temporaryPassword)
+    .forEach((credential) => {
+      void sendTemplate('welcome', {
+        to: credential.email,
+        name: credential.name,
+        email: credential.email,
+        password: credential.temporaryPassword,
+        loginUrl: `${env.clientUrl}/login`,
+      }).catch(() => {
+        /* Logged by the mailer; an undeliverable welcome must not fail the import. */
+      });
+    });
+
+  return sendCreated(res, {
+    data: summary,
+    message: `Imported ${summary.created} user(s)`,
+  });
 });
 
 /* ─── PATCH /users/:id ────────────────────────────────────────────────────── */
@@ -206,6 +288,7 @@ export const updateUser = asyncHandler(async (req, res) => {
   user.updatedBy = req.user._id;
 
   await user.save();
+  invalidateUser(user._id); // role/dept/unit/manager/status may have changed
 
   const after = user.toObject();
   const changes = diff(
@@ -261,6 +344,7 @@ export const updateUserStatus = asyncHandler(async (req, res) => {
   user.updatedBy = req.user._id;
   if (status !== 'ACTIVE') user.sessions = []; // a suspended user must lose their sessions immediately
   await user.save();
+  invalidateUser(user._id); // a status change must take effect immediately, not after the TTL
 
   await recordAudit({
     action: AUDIT_ACTION.USER_UPDATE,
@@ -288,15 +372,17 @@ export const resetUserPassword = asyncHandler(async (req, res) => {
   user.sessions = []; // the old credential is gone — drop every device
   user.updatedBy = req.user._id;
   await user.save();
+  invalidateUser(user._id);
 
   if (notify) {
-    await sendTemplate('welcome', {
+    // Fire-and-forget — SMTP latency must not hold the response open.
+    void sendTemplate('welcome', {
       to: user.email,
       name: user.name,
       email: user.email,
       password,
       loginUrl: `${env.clientUrl}/login`,
-    });
+    }).catch(() => {});
   }
 
   await recordAudit({
@@ -328,6 +414,7 @@ export const deleteUser = asyncHandler(async (req, res) => {
   user.sessions = [];
   user.updatedBy = req.user._id;
   await user.save();
+  invalidateUser(user._id);
 
   await recordAudit({
     action: AUDIT_ACTION.USER_DELETE,
@@ -379,6 +466,8 @@ export default {
   lookupUsers,
   getUser,
   createUser,
+  bulkImportUsers,
+  downloadImportTemplate,
   updateUser,
   updateUserStatus,
   resetUserPassword,

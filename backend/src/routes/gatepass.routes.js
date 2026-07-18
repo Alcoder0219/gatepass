@@ -78,8 +78,6 @@ router.delete(
   controller.deleteGatePass
 );
 
-router.get('/:id/qr', validate({ params: idParamSchema }), controller.getGatePassQr);
-
 router.get(
   '/:id/print',
   authorize(PERMISSION.GATEPASS_PRINT),

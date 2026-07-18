@@ -103,16 +103,17 @@ const PrintGatePass = () => {
           and stop the QR from scanning. ─────────────────────────────────────*/}
       <article className="print-page mx-auto max-w-[210mm] bg-white p-8 text-slate-900 shadow-glass print:p-6 print:shadow-none">
         <header className="flex items-start justify-between gap-6 border-b-2 border-slate-900 pb-4">
-          <div className="min-w-0">
+          <div className="flex min-w-0 items-center gap-4">
+            {data.company?.logo && (
+              <img
+                src={data.company.logo}
+                alt=""
+                className="h-16 w-16 shrink-0 object-contain"
+              />
+            )}
             <h1 className="truncate text-xl font-bold uppercase tracking-tight text-slate-900">
               {data.company?.name || 'Company'}
             </h1>
-            {data.company?.address && (
-              <p className="mt-1 text-[11px] leading-snug text-slate-600">{data.company.address}</p>
-            )}
-            <p className="text-[11px] text-slate-600">
-              {[data.company?.email, data.company?.phone].filter(Boolean).join(' · ')}
-            </p>
           </div>
 
           <div className="shrink-0 text-right">
@@ -125,8 +126,8 @@ const PrintGatePass = () => {
           </div>
         </header>
 
-        {/* Number + QR, side by side. */}
-        <section className="mt-5 flex items-center justify-between gap-6">
+        {/* Gate pass number. */}
+        <section className="mt-5">
           <div className="min-w-0">
             <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
               Gate pass number
@@ -136,17 +137,6 @@ const PrintGatePass = () => {
             </p>
             <p className="mt-1 text-[11px] text-slate-600">Raised on {formatDateTime(data.createdAt)}</p>
           </div>
-
-          {data.qrCode && (
-            <div className="shrink-0 text-center">
-              <img
-                src={data.qrCode}
-                alt={`QR code for ${data.gatePassNumber}`}
-                className="h-28 w-28 border border-slate-300 bg-white p-1"
-              />
-              <p className="mt-1 text-[10px] text-slate-500">Scan at the gate</p>
-            </div>
-          )}
         </section>
 
         <table className="mt-5 w-full border-collapse">

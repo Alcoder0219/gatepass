@@ -1,12 +1,12 @@
 import { Outlet } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { BarChart3, QrCode, Workflow } from 'lucide-react';
+import { BarChart3, ShieldCheck, Workflow } from 'lucide-react';
 import { Logo } from '@/components/common/Logo';
 import { BRAND } from '@/config/brand';
 
 const HIGHLIGHTS = [
   { icon: Workflow, title: 'Multi-stage approvals', text: 'Manager → HR → Security, with a full audit trail.' },
-  { icon: QrCode, title: 'QR gate verification', text: 'Guards scan, verify and record movement in seconds.' },
+  { icon: ShieldCheck, title: 'Gate verification', text: 'Guards verify and record every movement in seconds.' },
   { icon: BarChart3, title: 'Live analytics', text: 'Trends, turnaround and late returns across every unit.' },
 ];
 

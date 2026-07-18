@@ -2,7 +2,7 @@ import Settings from '../models/Settings.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { sendSuccess } from '../utils/ApiResponse.js';
 import ApiError from '../utils/ApiError.js';
-import { invalidateSettingsCache } from '../services/settings.service.js';
+import { invalidateSettingsCache, getSettings as getCachedSettings } from '../services/settings.service.js';
 import { recordAudit, diff } from '../services/audit.service.js';
 import { AUDIT_ACTION } from '../constants/index.js';
 
@@ -93,7 +93,9 @@ export const updateSettings = asyncHandler(async (req, res) => {
  * to render the shell.
  */
 export const getPublicSettings = asyncHandler(async (_req, res) => {
-  const settings = await Settings.getSingleton();
+  // Served from the shared 60s settings cache — this endpoint is hit on every
+  // page load by every user, and the data changes at most a few times a day.
+  const settings = await getCachedSettings();
 
   return sendSuccess(res, {
     message: 'Public settings fetched',

@@ -15,6 +15,7 @@ import {
 import { recordAudit } from '../services/audit.service.js';
 import { sendTemplate } from '../services/email.service.js';
 import { toPublicUrl } from '../middlewares/upload.middleware.js';
+import { invalidateUser } from '../utils/authCache.js';
 import { AUDIT_ACTION } from '../constants/index.js';
 
 const REFRESH_COOKIE = 'refreshToken';
@@ -66,6 +67,7 @@ const clearRefreshCookie = (res) =>
  * replayed against the API.
  */
 const issueSession = async (user, req, res, { remember = false } = {}) => {
+  invalidateUser(user._id); // a new/updated session must not read a stale cached copy
   const refreshToken = signRefreshToken(user, { remember });
   const maxAge = refreshMaxAge(remember);
   const now = Date.now();
@@ -264,6 +266,7 @@ export const resetPassword = asyncHandler(async (req, res) => {
   user.resetTokenExpiresAt = null;
   user.sessions = []; // every device must sign in again with the new password
   await user.save();
+  invalidateUser(user._id);
 
   clearRefreshCookie(res);
 
@@ -370,7 +373,10 @@ export const getMe = asyncHandler(async (req, res) =>
 
 /* ─── PATCH /auth/me ──────────────────────────────────────────────────────── */
 export const updateMe = asyncHandler(async (req, res) => {
-  const user = req.user;
+  // Fetch a fresh, writable document — req.user may be a shared read-only copy
+  // from the auth cache, which must never be mutated in place.
+  const user = await User.findById(req.user._id).populate(POPULATE);
+  if (!user) throw ApiError.notFound('User not found');
   const { name, phone, designation, preferences } = req.body;
 
   if (name !== undefined) user.name = name;
@@ -383,6 +389,7 @@ export const updateMe = asyncHandler(async (req, res) => {
   }
 
   await user.save();
+  invalidateUser(user._id);
 
   await recordAudit({
     action: AUDIT_ACTION.USER_UPDATE,
@@ -414,6 +421,7 @@ export const changePassword = asyncHandler(async (req, res) => {
   user.password = newPassword;
   user.sessions = []; // force every device to re-authenticate
   await user.save();
+  invalidateUser(user._id);
 
   clearRefreshCookie(res);
 
@@ -434,9 +442,12 @@ export const changePassword = asyncHandler(async (req, res) => {
 export const updateAvatar = asyncHandler(async (req, res) => {
   if (!req.file) throw ApiError.badRequest('An image file is required');
 
-  const user = req.user;
+  // Fresh, writable document — never mutate the shared auth-cache copy.
+  const user = await User.findById(req.user._id).populate(POPULATE);
+  if (!user) throw ApiError.notFound('User not found');
   user.profileImage = toPublicUrl(req.file, 'avatars');
   await user.save();
+  invalidateUser(user._id);
 
   return sendSuccess(res, {
     data: { profileImage: user.profileImage, user: user.toJSON() },

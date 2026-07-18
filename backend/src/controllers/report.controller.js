@@ -42,11 +42,19 @@ export const getGatePassReport = asyncHandler(async (req, res) => {
  * GET /reports/export?format=xlsx|csv|pdf
  * The controller stays thin: build the filter, fetch, hand off to the writer.
  */
+/** Hard ceiling on an export: the file writers run synchronously on the event
+ * loop, so an unbounded row count would block every other request while the
+ * workbook/PDF is built. A caller-supplied `limit` can only narrow this. */
+const MAX_EXPORT_ROWS = Number.parseInt(process.env.MAX_EXPORT_ROWS ?? '5000', 10) || 5000;
+
 export const exportReport = asyncHandler(async (req, res) => {
   const { format, limit, ...filters } = req.query;
 
+  const requested = Number.parseInt(limit ?? '', 10);
+  const cappedLimit = Math.min(Number.isNaN(requested) ? MAX_EXPORT_ROWS : Math.max(1, requested), MAX_EXPORT_ROWS);
+
   const filter = await buildReportFilter(req.user, filters);
-  const rows = await getExportRows(filter, limit);
+  const rows = await getExportRows(filter, cappedLimit);
   const { companyName } = await getExportBranding();
 
   const filename = exportFilename(format);

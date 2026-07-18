@@ -1,11 +1,18 @@
-import type { ReactNode } from 'react';
+import { memo, useCallback, type ReactNode } from 'react';
 import { motion } from 'framer-motion';
 import { ArrowUpDown, ChevronLeft, ChevronRight, Inbox } from 'lucide-react';
 import { cn } from '@/utils/cn';
 import { staggerContainer, staggerItem } from '@/animations/variants';
+import { useIsDesktop } from '@/hooks/useMediaQuery';
 import { Button } from './Button';
 import { TableSkeleton } from './Skeleton';
 import type { PaginationMeta } from '@/types';
+
+/* Hoisted out of render: staggerContainer() is a factory, and calling it inline
+ * minted a fresh Variants object on every render of every table, which framer
+ * treats as a changed animation definition. */
+const ROW_STAGGER = staggerContainer(0.03);
+const CARD_STAGGER = staggerContainer(0.04);
 
 export interface Column<T> {
   key: string;
@@ -46,10 +53,84 @@ const HIDE_BELOW = {
   '2xl': 'hidden 2xl:table-cell',
 } as const;
 
+/* ─── Row ────────────────────────────────────────────────────────────────────
+ * Split out and memoized. Before this, every row and every cell re-rendered on
+ * any parent state change — so a keystroke in a page-level search box re-ran
+ * `column.render()` for all 20 rows × 7 columns. The row only re-renders now if
+ * its own data, the column set, or the click handler actually changes.
+ *
+ * This memo is only worth anything if the caller keeps `columns` and `onRowClick`
+ * stable — see the useMemo/useCallback in the table's consumers.
+ * ────────────────────────────────────────────────────────────────────────── */
+interface RowProps<T> {
+  row: T;
+  index: number;
+  columns: Column<T>[];
+  onRowClick?: (row: T) => void;
+}
+
+const TableRowInner = <T,>({ row, index, columns, onRowClick }: RowProps<T>) => {
+  const handleClick = useCallback(() => onRowClick?.(row), [onRowClick, row]);
+
+  return (
+    <motion.tr
+      variants={staggerItem}
+      onClick={onRowClick ? handleClick : undefined}
+      className={cn(
+        'table-row-hover border-b border-line/60 last:border-0',
+        onRowClick && 'cursor-pointer'
+      )}
+    >
+      {columns.map((column) => (
+        <td
+          key={column.key}
+          className={cn(
+            'px-5 py-4 text-sm text-content',
+            column.hideBelow && HIDE_BELOW[column.hideBelow],
+            column.className
+          )}
+        >
+          {column.render(row, index)}
+        </td>
+      ))}
+    </motion.tr>
+  );
+};
+
+const TableRow = memo(TableRowInner) as typeof TableRowInner;
+
+interface CardProps<T> {
+  row: T;
+  onRowClick?: (row: T) => void;
+  mobileCard: (row: T) => ReactNode;
+}
+
+const MobileCardInner = <T,>({ row, onRowClick, mobileCard }: CardProps<T>) => {
+  const handleClick = useCallback(() => onRowClick?.(row), [onRowClick, row]);
+
+  return (
+    <motion.div
+      variants={staggerItem}
+      onClick={onRowClick ? handleClick : undefined}
+      className={onRowClick ? 'cursor-pointer' : undefined}
+    >
+      {mobileCard(row)}
+    </motion.div>
+  );
+};
+
+const MobileCard = memo(MobileCardInner) as typeof MobileCardInner;
+
 /**
  * The one table. It is responsive by construction: a real <table> from `md` up,
  * and a stack of cards below it — because a horizontally scrolling table on a
  * phone is a usability failure, not a layout.
+ *
+ * Note on virtualization: deliberately none. Every list here is paginated
+ * server-side at 20 rows, so a windowing library would add a dependency and a
+ * class of scroll bugs to virtualize twenty elements. If a page ever raises that
+ * limit or grows an "show all" view, revisit — until then, memoized rows are the
+ * correct and cheaper answer.
  */
 export function DataTable<T>({
   data,
@@ -67,6 +148,12 @@ export function DataTable<T>({
   mobileCard,
   className,
 }: DataTableProps<T>) {
+  /* Render ONE layout, not both. The card branch used to be built for every row
+   * and merely hidden with `md:hidden`, so a 20-row list mounted 20 rows AND 20
+   * cards — double the reconciliation and double the DOM, permanently. */
+  const isDesktop = useIsDesktop();
+  const showCards = Boolean(mobileCard) && !isDesktop;
+
   if (isLoading) return <TableSkeleton columns={Math.min(columns.length, 6)} />;
 
   if (!data.length) {
@@ -83,7 +170,8 @@ export function DataTable<T>({
   return (
     <div className={cn('space-y-4', className)}>
       {/* ── Desktop ───────────────────────────────────────────────────────── */}
-      <div className={cn('card overflow-hidden p-0', mobileCard && 'hidden md:block')}>
+      {!showCards && (
+      <div className="card overflow-hidden p-0">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[640px] border-collapse text-left">
             <thead>
@@ -120,53 +208,37 @@ export function DataTable<T>({
               </tr>
             </thead>
 
-            <motion.tbody variants={staggerContainer(0.03)} initial="initial" animate="animate">
+            <motion.tbody variants={ROW_STAGGER} initial="initial" animate="animate">
               {data.map((row, index) => (
-                <motion.tr
+                <TableRow
                   key={rowKey(row)}
-                  variants={staggerItem}
-                  onClick={onRowClick ? () => onRowClick(row) : undefined}
-                  className={cn(
-                    'table-row-hover border-b border-line/60 last:border-0',
-                    onRowClick && 'cursor-pointer'
-                  )}
-                >
-                  {columns.map((column) => (
-                    <td
-                      key={column.key}
-                      className={cn(
-                        'px-5 py-4 text-sm text-content',
-                        column.hideBelow && HIDE_BELOW[column.hideBelow],
-                        column.className
-                      )}
-                    >
-                      {column.render(row, index)}
-                    </td>
-                  ))}
-                </motion.tr>
+                  row={row}
+                  index={index}
+                  columns={columns}
+                  onRowClick={onRowClick}
+                />
               ))}
             </motion.tbody>
           </table>
         </div>
       </div>
+      )}
 
       {/* ── Mobile ────────────────────────────────────────────────────────── */}
-      {mobileCard && (
+      {showCards && mobileCard && (
         <motion.div
-          variants={staggerContainer(0.04)}
+          variants={CARD_STAGGER}
           initial="initial"
           animate="animate"
-          className="space-y-3 md:hidden"
+          className="space-y-3"
         >
           {data.map((row) => (
-            <motion.div
+            <MobileCard
               key={rowKey(row)}
-              variants={staggerItem}
-              onClick={onRowClick ? () => onRowClick(row) : undefined}
-              className={onRowClick ? 'cursor-pointer' : undefined}
-            >
-              {mobileCard(row)}
-            </motion.div>
+              row={row}
+              onRowClick={onRowClick}
+              mobileCard={mobileCard}
+            />
           ))}
         </motion.div>
       )}

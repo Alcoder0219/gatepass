@@ -214,8 +214,6 @@ export interface GatePass {
     entryRemark?: string;
   };
 
-  qrCode?: string;
-  qrToken?: string;
   expiresAt?: string | null;
   isLate: boolean;
   lateByMinutes: number;
@@ -440,4 +438,38 @@ export interface GatePassFilters {
   from?: string;
   to?: string;
   sort?: string;
+}
+
+/* ─── Bulk user import ───────────────────────────────────────────────────── */
+
+export interface UserImportRowError {
+  field: string;
+  message: string;
+}
+
+export interface UserImportRow {
+  /** 1-based line in the source file, counting the header — matches Excel. */
+  line: number;
+  valid: boolean;
+  errors: UserImportRowError[];
+  employeeId: string;
+  name: string;
+  email: string;
+}
+
+export interface UserImportCredential {
+  name: string;
+  email: string;
+  employeeId: string;
+  /** Only present when the server generated the password. */
+  temporaryPassword: string | null;
+}
+
+export interface UserImportSummary {
+  total: number;
+  valid: number;
+  invalid: number;
+  created: number;
+  rows: UserImportRow[];
+  credentials: UserImportCredential[];
 }

@@ -1,4 +1,4 @@
-import { useId, type ReactElement, type ReactNode } from 'react';
+import { memo, useId, type ReactElement, type ReactNode } from 'react';
 import {
   Area,
   AreaChart as RechartsAreaChart,
@@ -183,7 +183,7 @@ export interface AreaTrendChartProps {
   emptyMessage?: string;
 }
 
-export const AreaTrendChart = ({
+const AreaTrendChartInner = ({
   data,
   height = 300,
   comparison,
@@ -290,7 +290,7 @@ export interface BarChartProps {
   emptyMessage?: string;
 }
 
-export const BarChart = ({
+const BarChartInner = ({
   data,
   orientation = 'vertical',
   height = 300,
@@ -408,7 +408,7 @@ export interface DonutChartProps {
   emptyMessage?: string;
 }
 
-export const DonutChart = ({
+const DonutChartInner = ({
   data,
   height = 300,
   centreLabel = 'Total',
@@ -492,7 +492,7 @@ const STACK_SERIES: { key: keyof Omit<StackedDatum, 'name'>; name: string; statu
   { key: 'rejected', name: 'Rejected', status: 'REJECTED' },
 ];
 
-export const StackedBarChart = ({
+const StackedBarChartInner = ({
   data,
   height = 320,
   emptyMessage = 'No approver activity in this period.',
@@ -568,7 +568,7 @@ export interface LineChartProps {
   emptyMessage?: string;
 }
 
-export const LineChart = ({
+const LineChartInner = ({
   data,
   series,
   xKey = 'label',
@@ -640,3 +640,16 @@ export const toBars = (rows: { name: string; count: number }[], limit = 8): BarD
     .sort((a, b) => b.count - a.count)
     .slice(0, limit)
     .map((row) => ({ name: row.name, value: row.count }));
+
+/* ─── Memoized exports ───────────────────────────────────────────────────────
+ * recharts re-walks and re-animates its whole SVG tree on every render. None of
+ * these were memoized, so toggling a period filter on Analytics — or any
+ * unrelated query settling on the Dashboard — re-rendered and re-animated all
+ * five charts. Their data props are already useMemo'd by the callers, so these
+ * memos actually hold.
+ * ────────────────────────────────────────────────────────────────────────── */
+export const AreaTrendChart = memo(AreaTrendChartInner) as typeof AreaTrendChartInner;
+export const BarChart = memo(BarChartInner) as typeof BarChartInner;
+export const DonutChart = memo(DonutChartInner) as typeof DonutChartInner;
+export const StackedBarChart = memo(StackedBarChartInner) as typeof StackedBarChartInner;
+export const LineChart = memo(LineChartInner) as typeof LineChartInner;

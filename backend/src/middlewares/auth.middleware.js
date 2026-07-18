@@ -2,6 +2,7 @@ import ApiError from '../utils/ApiError.js';
 import asyncHandler from '../utils/asyncHandler.js';
 import { verifyAccessToken } from '../utils/tokens.js';
 import User from '../models/User.js';
+import { getCachedUser, setCachedUser } from '../utils/authCache.js';
 
 /**
  * Verifies the access token and hydrates `req.user` with the role populated.
@@ -26,11 +27,19 @@ export const authenticate = asyncHandler(async (req, _res, next) => {
 
   if (payload.tokenType !== 'access') throw ApiError.unauthorized('Invalid token type');
 
-  const user = await User.findById(payload.sub)
-    .populate('role')
-    .populate('department', 'name code')
-    .populate('unit', 'name code')
-    .populate('reportingManager', 'name employeeId email');
+  // Hot path: reuse the recently-resolved user (see utils/authCache.js) so the
+  // five populate round trips below run at most once per user per TTL, not on
+  // every request. The cached document is read-only for every handler except
+  // the profile writers, which re-fetch and invalidate.
+  let user = getCachedUser(payload.sub);
+  if (!user) {
+    user = await User.findById(payload.sub)
+      .populate('role')
+      .populate('department', 'name code')
+      .populate('unit', 'name code')
+      .populate('reportingManager', 'name employeeId email');
+    if (user) setCachedUser(payload.sub, user);
+  }
 
   if (!user) throw ApiError.unauthorized('The account for this token no longer exists');
   if (user.status !== 'ACTIVE') {

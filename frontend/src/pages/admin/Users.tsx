@@ -18,6 +18,7 @@ import {
   UserPlus,
   Users as UsersIcon,
   UserX,
+  Upload,
 } from 'lucide-react';
 
 import {
@@ -38,6 +39,7 @@ import {
   type SelectOption,
 } from '@/components/ui';
 import { PageHeader } from '@/components/common/PageHeader';
+import { UserImportModal } from './UserImportModal';
 import { Can } from '@/permissions/Can';
 import { PERMISSION } from '@/permissions/constants';
 import { usePermissions } from '@/permissions/usePermissions';
@@ -316,7 +318,7 @@ export const UserFormModal = ({ open, onClose, user, onSaved }: UserFormModalPro
         />
         <Input
           label="Phone"
-          placeholder="+91 98765 43210"
+          placeholder="+255 712345678"
           error={errors.phone?.message}
           {...register('phone')}
         />
@@ -497,6 +499,7 @@ const Users = () => {
 
   const [formUser, setFormUser] = useState<User | null>(null);
   const [formOpen, setFormOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
   const [resetTarget, setResetTarget] = useState<User | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<User | null>(null);
 
@@ -711,9 +714,18 @@ const Users = () => {
         breadcrumbs={[{ label: 'Administration' }, { label: 'Users' }]}
         actions={
           <Can do={PERMISSION.USERS_CREATE}>
-            <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
-              Add user
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="secondary"
+                leftIcon={<Upload className="h-4 w-4" />}
+                onClick={() => setImportOpen(true)}
+              >
+                Bulk upload
+              </Button>
+              <Button leftIcon={<Plus className="h-4 w-4" />} onClick={openCreate}>
+                Add user
+              </Button>
+            </div>
           </Can>
         }
       />
@@ -874,6 +886,8 @@ const Users = () => {
       />
 
       <UserFormModal open={formOpen} onClose={() => setFormOpen(false)} user={formUser} />
+
+      <UserImportModal open={importOpen} onClose={() => setImportOpen(false)} />
 
       <ResetPasswordModal
         open={Boolean(resetTarget)}

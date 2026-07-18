@@ -1,0 +1,18 @@
+# Root-context guard. The compose build contexts are ./backend and ./frontend
+# (each with its own .dockerignore), but this protects any root-context build.
+**/node_modules
+**/dist
+**/uploads
+**/src/logs
+**/*.log
+
+# Secrets — env comes only from Docker/Cloud Run
+.env
+.env.*
+!.env.example
+
+.git
+.gitignore
+.vscode
+.idea
+.DS_Store

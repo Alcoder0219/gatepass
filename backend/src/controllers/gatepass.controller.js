@@ -37,13 +37,6 @@ const DETAIL_POPULATE = [
   { path: 'security.entryBy', select: 'name employeeId' },
 ];
 
-/** The QR is only meaningful once the pass is usable at the gate. */
-export const QR_VISIBLE_STATUSES = [
-  GATEPASS_STATUS.APPROVED,
-  GATEPASS_STATUS.OUT,
-  GATEPASS_STATUS.COMPLETED,
-];
-
 /** A pass in one of these states can no longer be touched by the employee. */
 const TERMINAL_STATUSES = [
   GATEPASS_STATUS.REJECTED,
@@ -108,15 +101,11 @@ const loadViewableGatePass = async (user, id, populate = []) => {
   return gatePass;
 };
 
-/** Hides the QR from anyone looking at a pass that is not gate-ready yet. */
+/** Shapes a gate pass for the client. The stored qr fields are never exposed. */
 const present = (gatePass) => {
   const json = gatePass.toJSON();
-  if (!QR_VISIBLE_STATUSES.includes(json.status)) {
-    json.qrCode = '';
-    json.qrToken = undefined;
-  } else {
-    json.qrToken = undefined; // the token lives inside the QR image only
-  }
+  delete json.qrCode;
+  delete json.qrToken;
   return json;
 };
 
@@ -193,7 +182,7 @@ const paginateList = async (req, res, extra = [], message = 'Gate passes fetched
 
   result.docs = result.docs.map((doc) => {
     const row = { ...doc };
-    if (!QR_VISIBLE_STATUSES.includes(row.status)) row.qrCode = '';
+    delete row.qrCode;
     delete row.qrToken;
     delete row.timeline;
     return row;
@@ -241,27 +230,6 @@ export const getGatePass = asyncHandler(async (req, res) => {
   return sendSuccess(res, { message: 'Gate pass fetched', data: present(gatePass) });
 });
 
-export const getGatePassQr = asyncHandler(async (req, res) => {
-  const gatePass = await loadViewableGatePass(req.user, req.params.id);
-
-  if (!QR_VISIBLE_STATUSES.includes(gatePass.status)) {
-    throw ApiError.badRequest('A QR code is only available once the gate pass is approved');
-  }
-  if (!gatePass.qrCode) {
-    throw ApiError.badRequest('No QR code was minted for this gate pass');
-  }
-
-  return sendSuccess(res, {
-    message: 'QR code fetched',
-    data: {
-      gatePassNumber: gatePass.gatePassNumber,
-      status: gatePass.status,
-      qrCode: gatePass.qrCode,
-      expiresAt: gatePass.expiresAt,
-    },
-  });
-});
-
 /** Everything the print view needs in one payload. */
 export const getGatePassPrint = asyncHandler(async (req, res) => {
   const gatePass = await loadViewableGatePass(req.user, req.params.id, DETAIL_POPULATE);
@@ -272,7 +240,6 @@ export const getGatePassPrint = asyncHandler(async (req, res) => {
     message: 'Print payload fetched',
     data: {
       ...json,
-      qrCode: QR_VISIBLE_STATUSES.includes(gatePass.status) ? gatePass.qrCode : '',
       timeline: json.timeline ?? [],
       company: {
         name: settings.company.name,
@@ -427,7 +394,6 @@ export default {
   listPendingApproval,
   getGatePassStats,
   getGatePass,
-  getGatePassQr,
   getGatePassPrint,
   updateGatePass,
   addAttachments,

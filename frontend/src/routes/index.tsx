@@ -1,51 +1,68 @@
-import { lazy, Suspense } from 'react';
+import { Suspense } from 'react';
 import { Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { PERMISSION } from '@/permissions/constants';
 import { AuthLayout } from '@/layouts/AuthLayout';
 import { DashboardLayout } from '@/layouts/DashboardLayout';
 import { ProtectedRoute, PublicOnlyRoute } from './ProtectedRoute';
 import { FullPageLoader } from '@/components/common/FullPageLoader';
+import { lazyWithRetry } from './lazyWithRetry';
 
 /* Code-split every page: the login screen should not ship Recharts. */
-const Login = lazy(() => import('@/pages/auth/Login'));
-const ForgotPassword = lazy(() => import('@/pages/auth/ForgotPassword'));
-const ResetPassword = lazy(() => import('@/pages/auth/ResetPassword'));
-const VerifyOtp = lazy(() => import('@/pages/auth/VerifyOtp'));
+const Login = lazyWithRetry(() => import('@/pages/auth/Login'));
+const ForgotPassword = lazyWithRetry(() => import('@/pages/auth/ForgotPassword'));
+const ResetPassword = lazyWithRetry(() => import('@/pages/auth/ResetPassword'));
+const VerifyOtp = lazyWithRetry(() => import('@/pages/auth/VerifyOtp'));
 
-const Dashboard = lazy(() => import('@/pages/Dashboard'));
-const Analytics = lazy(() => import('@/pages/Analytics'));
-const CalendarView = lazy(() => import('@/pages/CalendarView'));
+const Dashboard = lazyWithRetry(() => import('@/pages/Dashboard'));
+const Analytics = lazyWithRetry(() => import('@/pages/Analytics'));
+const CalendarView = lazyWithRetry(() => import('@/pages/CalendarView'));
 
-const NewGatePass = lazy(() => import('@/pages/gatepass/NewGatePass'));
-const MyGatePasses = lazy(() => import('@/pages/gatepass/MyGatePasses'));
-const AllGatePasses = lazy(() => import('@/pages/gatepass/AllGatePasses'));
-const GatePassDetail = lazy(() => import('@/pages/gatepass/GatePassDetail'));
-const PrintGatePass = lazy(() => import('@/pages/gatepass/PrintGatePass'));
+const NewGatePass = lazyWithRetry(() => import('@/pages/gatepass/NewGatePass'));
+const MyGatePasses = lazyWithRetry(() => import('@/pages/gatepass/MyGatePasses'));
+const AllGatePasses = lazyWithRetry(() => import('@/pages/gatepass/AllGatePasses'));
+const GatePassDetail = lazyWithRetry(() => import('@/pages/gatepass/GatePassDetail'));
+const PrintGatePass = lazyWithRetry(() => import('@/pages/gatepass/PrintGatePass'));
 
-const PendingApprovals = lazy(() => import('@/pages/approvals/PendingApprovals'));
-const ApprovedPasses = lazy(() => import('@/pages/approvals/ApprovedPasses'));
-const RejectedPasses = lazy(() => import('@/pages/approvals/RejectedPasses'));
+const PendingApprovals = lazyWithRetry(() => import('@/pages/approvals/PendingApprovals'));
+const ApprovedPasses = lazyWithRetry(() => import('@/pages/approvals/ApprovedPasses'));
+const RejectedPasses = lazyWithRetry(() => import('@/pages/approvals/RejectedPasses'));
 
-const HRReview = lazy(() => import('@/pages/hr/HRReview'));
-const SecurityConsole = lazy(() => import('@/pages/security/SecurityConsole'));
+const HRReview = lazyWithRetry(() => import('@/pages/hr/HRReview'));
+const SecurityConsole = lazyWithRetry(() => import('@/pages/security/SecurityConsole'));
 
-const Reports = lazy(() => import('@/pages/Reports'));
-const NotificationsPage = lazy(() => import('@/pages/Notifications'));
-const AuditLogs = lazy(() => import('@/pages/AuditLogs'));
+const Reports = lazyWithRetry(() => import('@/pages/Reports'));
+const NotificationsPage = lazyWithRetry(() => import('@/pages/Notifications'));
+const AuditLogs = lazyWithRetry(() => import('@/pages/AuditLogs'));
 
-const Users = lazy(() => import('@/pages/admin/Users'));
-const UserDetail = lazy(() => import('@/pages/admin/UserDetail'));
-const Roles = lazy(() => import('@/pages/admin/Roles'));
-const Departments = lazy(() => import('@/pages/admin/Departments'));
-const Units = lazy(() => import('@/pages/admin/Units'));
-const SettingsPage = lazy(() => import('@/pages/admin/Settings'));
+const Users = lazyWithRetry(() => import('@/pages/admin/Users'));
+const UserDetail = lazyWithRetry(() => import('@/pages/admin/UserDetail'));
+const Roles = lazyWithRetry(() => import('@/pages/admin/Roles'));
+const Departments = lazyWithRetry(() => import('@/pages/admin/Departments'));
+const Units = lazyWithRetry(() => import('@/pages/admin/Units'));
+const SettingsPage = lazyWithRetry(() => import('@/pages/admin/Settings'));
 
-const Profile = lazy(() => import('@/pages/Profile'));
-const Tutorials = lazy(() => import('@/pages/Tutorials'));
-const NotFound = lazy(() => import('@/pages/NotFound'));
+const Profile = lazyWithRetry(() => import('@/pages/Profile'));
+const Tutorials = lazyWithRetry(() => import('@/pages/Tutorials'));
+const NotFound = lazyWithRetry(() => import('@/pages/NotFound'));
 
-/** Wraps a lazy page in its suspense boundary + permission gate. */
+/**
+ * Permission gate only — deliberately NO Suspense boundary.
+ *
+ * These pages render through DashboardLayout's <Outlet/>, which is wrapped in an
+ * AnimatePresence. A Suspense boundary here would catch the lazy chunk *inside*
+ * that presence tree, and a suspended child makes AnimatePresence drop both the
+ * outgoing and incoming page — the blank screen on rapid sidebar navigation.
+ *
+ * The layout owns a single Suspense boundary above AnimatePresence instead, so
+ * suspension is handled where it cannot orphan an animation. Routes rendered
+ * OUTSIDE the dashboard chrome still need their own boundary — see `standalone`.
+ */
 const guard = (element: React.ReactNode, permissions?: string[]) => (
+  <ProtectedRoute permissions={permissions}>{element}</ProtectedRoute>
+);
+
+/** For routes with no layout above them, so nothing else provides a boundary. */
+const standalone = (element: React.ReactNode, permissions?: string[]) => (
   <ProtectedRoute permissions={permissions}>
     <Suspense fallback={<FullPageLoader />}>{element}</Suspense>
   </ProtectedRoute>
@@ -75,7 +92,7 @@ export const AppRoutes = () => {
       {/* The print view deliberately sits OUTSIDE the dashboard chrome. */}
       <Route
         path="/gate-pass/:id/print"
-        element={guard(<PrintGatePass />, [PERMISSION.GATEPASS_PRINT])}
+        element={standalone(<PrintGatePass />, [PERMISSION.GATEPASS_PRINT])}
       />
 
       {/* ── App ───────────────────────────────────────────────────────────── */}

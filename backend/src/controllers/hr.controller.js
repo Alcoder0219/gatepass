@@ -6,7 +6,7 @@ import { sendSuccess, sendPaginated } from '../utils/ApiResponse.js';
 import { dateFilter, dayjs } from '../utils/dates.js';
 import gatepassService from '../services/gatepass.service.js';
 import { GATEPASS_STATUS } from '../constants/index.js';
-import { buildGatePassFilter, LIST_POPULATE, QR_VISIBLE_STATUSES } from './gatepass.controller.js';
+import { buildGatePassFilter, LIST_POPULATE } from './gatepass.controller.js';
 
 const loadGatePass = async (id) => {
   const gatePass = await GatePass.findOne({ _id: id, isDeleted: false });
@@ -16,7 +16,7 @@ const loadGatePass = async (id) => {
 
 const stripQr = (doc) => {
   const row = { ...doc };
-  if (!QR_VISIBLE_STATUSES.includes(row.status)) row.qrCode = '';
+  delete row.qrCode;
   delete row.qrToken;
   delete row.timeline;
   return row;

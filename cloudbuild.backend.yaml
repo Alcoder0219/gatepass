@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloud Build: backend API  →  Artifact Registry  →  Cloud Run
+#
+# Works both ways:
+#   • Manual:   gcloud builds submit --config cloudbuild.backend.yaml
+#   • Trigger:  a Cloud Build Trigger on push to main (see README/commands below)
+#
+# Everything configurable is a substitution — nothing environment-specific is
+# hardcoded. Secrets come from Secret Manager, never from this file.
+# ─────────────────────────────────────────────────────────────────────────────
+substitutions:
+  _REGION: us-central1          # Artifact Registry + Cloud Run region
+  _REPOSITORY: gatepass         # Artifact Registry repo name
+  _SERVICE: gatepass-api        # Cloud Run service name
+  _TAG: latest                  # trigger overrides this with $SHORT_SHA
+  _API_PREFIX: /api/v1
+  _CLIENT_URL: https://REPLACE-WITH-FRONTEND-URL.run.app  # CORS origin + email deep links
+  _MEMORY: 512Mi
+  _CPU: "1"
+  _MIN_INSTANCES: "0"
+  _MAX_INSTANCES: "10"
+  _CONCURRENCY: "80"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+steps:
+  # 1 ─ Build the image (context = ./backend, so backend/.dockerignore applies)
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - backend/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:latest
+      - backend
+
+  # 2 ─ Push both tags to Artifact Registry
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}
+
+  # 3 ─ Deploy to Cloud Run.
+  #     Cloud Run injects PORT (8080) — the app listens on process.env.PORT.
+  #     Non-secret config → --set-env-vars ; secrets → --set-secrets (Secret Manager).
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --port=8080
+      - --allow-unauthenticated
+      - --cpu=${_CPU}
+      - --memory=${_MEMORY}
+      - --min-instances=${_MIN_INSTANCES}
+      - --max-instances=${_MAX_INSTANCES}
+      - --concurrency=${_CONCURRENCY}
+      - --set-env-vars=NODE_ENV=production,API_PREFIX=${_API_PREFIX},CLIENT_URL=${_CLIENT_URL},JOBS_ENABLED=true,BCRYPT_SALT_ROUNDS=12,RATE_LIMIT_WINDOW_MINUTES=15,RATE_LIMIT_MAX=300
+      - --set-secrets=MONGODB_URI=MONGODB_URI:latest,JWT_ACCESS_SECRET=JWT_ACCESS_SECRET:latest,JWT_REFRESH_SECRET=JWT_REFRESH_SECRET:latest
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:latest
+
+timeout: 1200s

@@ -1,0 +1,74 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Cloud Build: frontend (Vite build → nginx)  →  Artifact Registry  →  Cloud Run
+#
+# The frontend is a static bundle served by nginx. Vite inlines VITE_API_URL at
+# BUILD time, so it is passed as a --build-arg and MUST be the backend's public
+# URL (never localhost). nginx listens on Cloud Run's injected $PORT (8080).
+#
+#   • Manual:   gcloud builds submit --config cloudbuild.frontend.yaml \
+#                 --substitutions=_VITE_API_URL=https://<backend-url>/api/v1
+#   • Trigger:  Cloud Build Trigger on push to main (set _VITE_API_URL there)
+# ─────────────────────────────────────────────────────────────────────────────
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: gatepass
+  _SERVICE: gatepass-web
+  _TAG: latest                                            # trigger overrides with $SHORT_SHA
+  _VITE_API_URL: https://REPLACE-WITH-BACKEND-URL.run.app/api/v1   # backend public URL + /api/v1
+  _MEMORY: 256Mi
+  _CPU: "1"
+  _MIN_INSTANCES: "0"
+  _MAX_INSTANCES: "5"
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  dynamicSubstitutions: true
+
+steps:
+  # 1 ─ Build (context = ./frontend). VITE_API_URL is baked into the bundle here.
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - frontend/Dockerfile
+      - --build-arg
+      - VITE_API_URL=${_VITE_API_URL}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+      - -t
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:latest
+      - frontend
+
+  # 2 ─ Push both tags to Artifact Registry
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}
+
+  # 3 ─ Deploy to Cloud Run. nginx renders `listen 8080` from the injected PORT.
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk
+    entrypoint: gcloud
+    args:
+      - run
+      - deploy
+      - ${_SERVICE}
+      - --image=${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+      - --region=${_REGION}
+      - --platform=managed
+      - --port=8080
+      - --allow-unauthenticated
+      - --cpu=${_CPU}
+      - --memory=${_MEMORY}
+      - --min-instances=${_MIN_INSTANCES}
+      - --max-instances=${_MAX_INSTANCES}
+      - --quiet
+
+images:
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:${_TAG}
+  - ${_REGION}-docker.pkg.dev/${PROJECT_ID}/${_REPOSITORY}/${_SERVICE}:latest
+
+timeout: 1200s

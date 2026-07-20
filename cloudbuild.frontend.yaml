@@ -10,7 +10,7 @@
 #   • Trigger:  Cloud Build Trigger on push to main (set _VITE_API_URL there)
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
-  _REGION: us-central1
+  _REGION: asia-south1
   _REPOSITORY: gatepass
   _SERVICE: gatepass-web
   _TAG: latest                                            # trigger overrides with $SHORT_SHA

@@ -9,7 +9,7 @@
 # hardcoded. Secrets come from Secret Manager, never from this file.
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
-  _REGION: us-central1          # Artifact Registry + Cloud Run region
+  _REGION: asia-south1         # Artifact Registry + Cloud Run region
   _REPOSITORY: gatepass         # Artifact Registry repo name
   _SERVICE: gatepass-api        # Cloud Run service name
   _TAG: latest                  # trigger overrides this with $SHORT_SHA

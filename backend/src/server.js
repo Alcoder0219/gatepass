@@ -8,15 +8,49 @@ import { startJobs, stopJobs } from './jobs/index.js';
 
 const server = http.createServer(app);
 
+// Cloud Run connects to the container on 0.0.0.0:$PORT — bind explicitly.
+const HOST = '0.0.0.0';
+
+/**
+ * Connect to MongoDB in the BACKGROUND with retry/backoff. Deliberately NOT
+ * awaited before `server.listen`: on Cloud Run the container must open the port
+ * quickly or the start probe times out. If Mongo is briefly unreachable (Atlas
+ * IP allow-list, cold DNS, transient network) the HTTP server stays up, the
+ * error is logged in full, and we retry — instead of the whole container dying.
+ * Mongoose buffers queries until the connection is ready, so early requests wait
+ * rather than fail.
+ */
+const connectWithRetry = async (attempt = 1) => {
+  try {
+    logger.info(`[BOOT] Connecting MongoDB (attempt ${attempt})...`);
+    await connectDatabase();
+    logger.info('[BOOT] MongoDB connected.');
+  } catch (error) {
+    const delayMs = Math.min(30_000, 2_000 * attempt);
+    logger.error(`[BOOT] MongoDB connection failed: ${error.message}`, { stack: error.stack });
+    logger.warn(`[BOOT] Retrying MongoDB in ${delayMs / 1000}s — HTTP server stays up.`);
+    setTimeout(() => connectWithRetry(attempt + 1), delayMs).unref();
+  }
+};
+
 const bootstrap = async () => {
-  await connectDatabase();
+  logger.info('[BOOT] Loading environment...');
+  logger.info(`[BOOT] Environment loaded. NODE_ENV=${env.nodeEnv} PORT=${env.port}`);
+
+  logger.info('[BOOT] Initializing Socket...');
   initSocket(server);
+
+  logger.info('[BOOT] Starting Jobs...');
   startJobs();
 
-  server.listen(env.port, () => {
-    logger.info(`GatePass Pro API listening on http://localhost:${env.port}${env.apiPrefix}`);
+  logger.info('[BOOT] Starting HTTP Server...');
+  server.listen(env.port, HOST, () => {
+    logger.info(`[BOOT] Listening on ${HOST}:${env.port}${env.apiPrefix}`);
     logger.info(`Environment: ${env.nodeEnv} | CORS origin: ${env.clientUrl}`);
   });
+
+  // DB comes up independently of the port — never blocks startup.
+  connectWithRetry();
 };
 
 /* ─── Graceful shutdown ──────────────────────────────────────────────────── */

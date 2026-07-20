@@ -5,11 +5,13 @@
 #   • Manual:   gcloud builds submit --config cloudbuild.backend.yaml
 #   • Trigger:  a Cloud Build Trigger on push to main (see README/commands below)
 #
-# Everything configurable is a substitution — nothing environment-specific is
-# hardcoded. Secrets come from Secret Manager, never from this file.
+# Secrets are passed as plain environment variables via --update-env-vars (NOT
+# Secret Manager). Provide their real values through the Cloud Build Trigger's
+# substitution variables (stored in GCP) or via `--substitutions` at submit time.
+# Do NOT commit real secret values into this file — it lives in a public repo.
 # ─────────────────────────────────────────────────────────────────────────────
 substitutions:
-  _REGION: asia-south1         # Artifact Registry + Cloud Run region
+  _REGION: asia-south1          # Artifact Registry + Cloud Run region
   _REPOSITORY: gatepass         # Artifact Registry repo name
   _SERVICE: gatepass-api        # Cloud Run service name
   _TAG: latest                  # trigger overrides this with $SHORT_SHA
@@ -20,6 +22,13 @@ substitutions:
   _MIN_INSTANCES: "0"
   _MAX_INSTANCES: "10"
   _CONCURRENCY: "80"
+
+  # Required app secrets — set these in the Trigger substitutions / --substitutions.
+  # Leaving them blank deploys with empty values (the API still starts, but DB and
+  # auth requests fail until they are provided).
+  _MONGODB_URI: ""
+  _JWT_ACCESS_SECRET: ""
+  _JWT_REFRESH_SECRET: ""
 
 options:
   logging: CLOUD_LOGGING_ONLY
@@ -49,7 +58,11 @@ steps:
 
   # 3 ─ Deploy to Cloud Run.
   #     Cloud Run injects PORT (8080) — the app listens on process.env.PORT.
-  #     Non-secret config → --set-env-vars ; secrets → --set-secrets (Secret Manager).
+  #     All env vars (config + secrets) are passed with a single --update-env-vars.
+  #     NOTE: values are comma-separated. The MONGODB_URI here is an SRV string
+  #     (no commas). If a value ever contains a comma, switch to gcloud's custom
+  #     delimiter form, e.g. --update-env-vars=^@^KEY1=val1@KEY2=val2 (pick a
+  #     delimiter that appears in none of the values).
   - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk
     entrypoint: gcloud
@@ -67,8 +80,7 @@ steps:
       - --min-instances=${_MIN_INSTANCES}
       - --max-instances=${_MAX_INSTANCES}
       - --concurrency=${_CONCURRENCY}
-      - --set-env-vars=NODE_ENV=production,API_PREFIX=${_API_PREFIX},CLIENT_URL=${_CLIENT_URL},JOBS_ENABLED=true,BCRYPT_SALT_ROUNDS=12,RATE_LIMIT_WINDOW_MINUTES=15,RATE_LIMIT_MAX=300
-     
+      - --update-env-vars=NODE_ENV=production,API_PREFIX=${_API_PREFIX},CLIENT_URL=${_CLIENT_URL},JOBS_ENABLED=true,BCRYPT_SALT_ROUNDS=12,RATE_LIMIT_WINDOW_MINUTES=15,RATE_LIMIT_MAX=300,MONGODB_URI=${_MONGODB_URI},JWT_ACCESS_SECRET=${_JWT_ACCESS_SECRET},JWT_REFRESH_SECRET=${_JWT_REFRESH_SECRET}
       - --quiet
 
 images:

@@ -8,14 +8,25 @@ dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 const required = ['MONGODB_URI', 'JWT_ACCESS_SECRET', 'JWT_REFRESH_SECRET'];
 
-const missing = required.filter((key) => !process.env[key]);
-if (missing.length) {
+export const missingEnv = required.filter((key) => !process.env[key]);
+if (missingEnv.length) {
+  /*
+   * Cloud Run compatible: log loudly but DO NOT `process.exit()` here.
+   * This module is imported before the HTTP server binds its port, so exiting
+   * now makes the container die before it can listen — Cloud Run then reports
+   * "failed to start and listen on the port" with no actionable signal, and the
+   * platform keeps retrying a container that can never succeed.
+   *
+   * Instead we surface the misconfiguration in the logs and let server.js bring
+   * the HTTP server up anyway, so /health responds and the logs are readable.
+   * The missing values are set via Secret Manager / Cloud Run env vars.
+   */
   // eslint-disable-next-line no-console
   console.error(
-    `\n[config] Missing required environment variables: ${missing.join(', ')}\n` +
-      `[config] Copy backend/.env.example to backend/.env and fill them in.\n`
+    `\n[BOOT] Missing required environment variables: ${missingEnv.join(', ')}\n` +
+      `[BOOT] The API will start, but requests needing these will fail until they are set ` +
+      `(Cloud Run: --set-secrets / --set-env-vars; local: backend/.env).\n`
   );
-  process.exit(1);
 }
 
 const int = (value, fallback) => {

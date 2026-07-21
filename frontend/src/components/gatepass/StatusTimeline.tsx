@@ -99,7 +99,7 @@ export const StatusTimeline = ({ timeline }: { timeline: TimelineEntry[] }) => {
 /* ─── Horizontal stage tracker ───────────────────────────────────────────── */
 const STAGES = [
   { key: 'EMPLOYEE', label: 'Submitted' },
-  { key: 'MANAGER', label: 'Manager' },
+  { key: 'MANAGER', label: 'HOD' },
   { key: 'HR', label: 'HR Review' },
   { key: 'SECURITY', label: 'Security' },
   { key: 'DONE', label: 'Completed' },

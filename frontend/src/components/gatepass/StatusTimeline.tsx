@@ -17,8 +17,8 @@ import type { GatePass, TimelineEntry } from '@/types';
 const ACTION_META: Record<string, { icon: typeof FileText; tone: string; label: string }> = {
   SUBMITTED: { icon: FileText, tone: 'bg-brand-500/15 text-brand-500', label: 'Gate pass submitted' },
   RESUBMITTED: { icon: FileText, tone: 'bg-brand-500/15 text-brand-500', label: 'Resubmitted after changes' },
-  MANAGER_APPROVED: { icon: CheckCircle2, tone: 'bg-success-500/15 text-success-500', label: 'Approved by manager' },
-  MANAGER_REJECTED: { icon: XCircle, tone: 'bg-danger-500/15 text-danger-500', label: 'Rejected by manager' },
+  MANAGER_APPROVED: { icon: CheckCircle2, tone: 'bg-success-500/15 text-success-500', label: 'Approved by HOD' },
+  MANAGER_REJECTED: { icon: XCircle, tone: 'bg-danger-500/15 text-danger-500', label: 'Rejected by HOD' },
   CHANGES_REQUESTED: { icon: MessageSquare, tone: 'bg-info-500/15 text-info-500', label: 'Changes requested' },
   HR_REVIEW_OK: { icon: ShieldCheck, tone: 'bg-success-500/15 text-success-500', label: 'HR review — OK' },
   HR_REVIEW_NOT_OK: { icon: XCircle, tone: 'bg-warning-500/15 text-warning-500', label: 'HR review — Not OK' },

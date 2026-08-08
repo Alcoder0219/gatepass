@@ -13,6 +13,8 @@
     "seed": "node src/seeds/index.js",
     "seed:fresh": "node src/seeds/index.js --fresh",
     "seed:prod": "node src/seeds/production.js",
+    "seed:leave": "node src/modules/leave/seeds/index.js",
+    "migrate:leave-permissions": "node src/modules/leave/seeds/grantPermissions.js",
     "lint": "eslint src --ext .js"
   },
   "dependencies": {

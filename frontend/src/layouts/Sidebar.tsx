@@ -15,7 +15,9 @@ interface SidebarProps {
   onToggleCollapse: () => void;
   mobileOpen: boolean;
   onCloseMobile: () => void;
-  badges?: Partial<Record<'pending' | 'hrReview' | 'security' | 'notifications', number>>;
+  badges?: Partial<
+    Record<'pending' | 'hrReview' | 'security' | 'notifications' | 'leaveApproval', number>
+  >;
 }
 
 const Brand = ({ collapsed }: { collapsed: boolean }) => (

@@ -29,6 +29,26 @@ export const PERMISSION = {
   SECURITY_MARK_RETURN: 'security.mark_return',
   SECURITY_SCAN: 'security.scan',
 
+  LEAVE_TYPE_VIEW: 'leave_type.view',
+  LEAVE_TYPE_CREATE: 'leave_type.create',
+  LEAVE_TYPE_UPDATE: 'leave_type.update',
+  LEAVE_TYPE_DELETE: 'leave_type.delete',
+
+  LEAVE_ALLOCATION_VIEW: 'leave_allocation.view',
+  LEAVE_ALLOCATION_CREATE: 'leave_allocation.create',
+  LEAVE_ALLOCATION_UPDATE: 'leave_allocation.update',
+  LEAVE_ALLOCATION_DELETE: 'leave_allocation.delete',
+
+  LEAVE_APPLY: 'leave.apply',
+  LEAVE_VIEW_OWN: 'leave.view_own',
+  LEAVE_APPLY_BULK: 'leave.apply_bulk',
+
+  LEAVE_APPROVE: 'leave.approve',
+  LEAVE_HR_REVIEW: 'leave.hr_review',
+  LEAVE_DELETE: 'leave.delete',
+  LEAVE_REPORTS_VIEW: 'leave.reports_view',
+  LEAVE_REPORTS_EXPORT: 'leave.reports_export',
+
   REPORTS_VIEW: 'reports.view',
   REPORTS_EXPORT: 'reports.export',
 

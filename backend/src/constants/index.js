@@ -63,6 +63,38 @@ export const PERMISSION = Object.freeze({
   SECURITY_MARK_RETURN: 'security.mark_return',
   SECURITY_SCAN: 'security.scan',
 
+  // Leave management — leave types
+  LEAVE_TYPE_VIEW: 'leave_type.view',
+  LEAVE_TYPE_CREATE: 'leave_type.create',
+  LEAVE_TYPE_UPDATE: 'leave_type.update',
+  LEAVE_TYPE_DELETE: 'leave_type.delete',
+
+  // Leave management — allocation of balances to employees
+  LEAVE_ALLOCATION_VIEW: 'leave_allocation.view',
+  LEAVE_ALLOCATION_CREATE: 'leave_allocation.create',
+  LEAVE_ALLOCATION_UPDATE: 'leave_allocation.update',
+  LEAVE_ALLOCATION_DELETE: 'leave_allocation.delete',
+
+  // Leave management — applying for leave
+  LEAVE_APPLY: 'leave.apply',
+  LEAVE_VIEW_OWN: 'leave.view_own',
+  LEAVE_APPLY_BULK: 'leave.apply_bulk',
+
+  // Leave management — approval workflow (Employee → HOD → HR)
+  LEAVE_APPROVE: 'leave.approve',
+  LEAVE_HR_REVIEW: 'leave.hr_review',
+
+  /**
+   * Deletion is deliberately a single permission covering view AND act: the
+   * register exposes every employee's leave history, so seeing it is as
+   * privileged as using it. Granted to HR and Admin only.
+   */
+  LEAVE_DELETE: 'leave.delete',
+
+  // Leave management — reporting
+  LEAVE_REPORTS_VIEW: 'leave.reports_view',
+  LEAVE_REPORTS_EXPORT: 'leave.reports_export',
+
   // Reports
   REPORTS_VIEW: 'reports.view',
   REPORTS_EXPORT: 'reports.export',
@@ -138,6 +170,27 @@ export const PERMISSION_CATALOGUE = [
       { key: PERMISSION.SECURITY_SCAN, label: 'Scan QR', description: 'Scan and verify a gate pass QR' },
       { key: PERMISSION.SECURITY_MARK_EXIT, label: 'Mark Exit', description: 'Record actual out time' },
       { key: PERMISSION.SECURITY_MARK_RETURN, label: 'Mark Return', description: 'Record actual in time' },
+    ],
+  },
+  {
+    group: 'Leave Management',
+    permissions: [
+      { key: PERMISSION.LEAVE_TYPE_VIEW, label: 'Leave Types', description: 'View the leave type catalogue', sidebar: true },
+      { key: PERMISSION.LEAVE_TYPE_CREATE, label: 'Create Leave Type', description: 'Add a new leave type' },
+      { key: PERMISSION.LEAVE_TYPE_UPDATE, label: 'Update Leave Type', description: 'Edit an existing leave type' },
+      { key: PERMISSION.LEAVE_TYPE_DELETE, label: 'Delete Leave Type', description: 'Deactivate or delete a leave type' },
+      { key: PERMISSION.LEAVE_ALLOCATION_VIEW, label: 'Leave Allocation', description: 'View allocated leave balances', sidebar: true },
+      { key: PERMISSION.LEAVE_ALLOCATION_CREATE, label: 'Create Allocation', description: 'Allocate leave to employees' },
+      { key: PERMISSION.LEAVE_ALLOCATION_UPDATE, label: 'Update Allocation', description: 'Revise an allocated balance' },
+      { key: PERMISSION.LEAVE_ALLOCATION_DELETE, label: 'Delete Allocation', description: 'Remove an allocation' },
+      { key: PERMISSION.LEAVE_APPLY, label: 'Apply Leave', description: 'Raise a leave application for yourself', sidebar: true },
+      { key: PERMISSION.LEAVE_VIEW_OWN, label: 'My Leaves', description: 'See your own leave applications', sidebar: true },
+      { key: PERMISSION.LEAVE_APPLY_BULK, label: 'Bulk Apply', description: 'Apply leave on behalf of other employees' },
+      { key: PERMISSION.LEAVE_APPROVE, label: 'Leave Approval', description: 'Approve or reject at the manager stage', sidebar: true },
+      { key: PERMISSION.LEAVE_HR_REVIEW, label: 'Leave HR Review', description: 'Approve or reject at the HR stage', sidebar: true },
+      { key: PERMISSION.LEAVE_DELETE, label: 'Leave Deletion', description: 'Delete leave records and restore the balance — HR and Admin only', sidebar: true },
+      { key: PERMISSION.LEAVE_REPORTS_VIEW, label: 'Leave Reports', description: 'Open the leave reporting module', sidebar: true },
+      { key: PERMISSION.LEAVE_REPORTS_EXPORT, label: 'Export Leave Reports', description: 'Download reports as Excel, CSV or PDF' },
     ],
   },
   {
@@ -303,6 +356,21 @@ export const AUDIT_ACTION = Object.freeze({
   DEPARTMENT_UPSERT: 'DEPARTMENT_UPSERT',
   HOLIDAY_UPSERT: 'HOLIDAY_UPSERT',
   EXPORT: 'EXPORT',
+  // Leave management. These MUST exist here: `recordAudit` swallows its errors,
+  // so an action missing from this enum fails the audit write silently.
+  LEAVE_TYPE_CREATE: 'LEAVE_TYPE_CREATE',
+  LEAVE_TYPE_UPDATE: 'LEAVE_TYPE_UPDATE',
+  LEAVE_TYPE_DELETE: 'LEAVE_TYPE_DELETE',
+  LEAVE_ALLOCATION_CREATE: 'LEAVE_ALLOCATION_CREATE',
+  LEAVE_ALLOCATION_UPDATE: 'LEAVE_ALLOCATION_UPDATE',
+  LEAVE_ALLOCATION_DELETE: 'LEAVE_ALLOCATION_DELETE',
+  LEAVE_APPLY: 'LEAVE_APPLY',
+  LEAVE_APPLY_BULK: 'LEAVE_APPLY_BULK',
+  LEAVE_APPROVE: 'LEAVE_APPROVE',
+  LEAVE_HR_APPROVE: 'LEAVE_HR_APPROVE',
+  LEAVE_REJECT: 'LEAVE_REJECT',
+  LEAVE_SEND_BACK: 'LEAVE_SEND_BACK',
+  LEAVE_DELETE: 'LEAVE_DELETE',
 });
 
 export const AUDIT_ACTIONS = Object.values(AUDIT_ACTION);

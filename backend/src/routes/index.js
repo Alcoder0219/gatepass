@@ -15,6 +15,7 @@ import notificationRoutes from './notification.routes.js';
 import auditRoutes from './audit.routes.js';
 import settingsRoutes from './settings.routes.js';
 import searchRoutes from './search.routes.js';
+import leaveModuleRoutes from '../modules/leave/routes/index.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -63,5 +64,8 @@ router.use('/notifications', notificationRoutes);
 router.use('/audit-logs', auditRoutes);
 router.use('/settings', settingsRoutes);
 router.use('/search', searchRoutes);
+
+/* Leave Management — self-contained under src/modules/leave. */
+router.use('/leave', leaveModuleRoutes);
 
 export default router;

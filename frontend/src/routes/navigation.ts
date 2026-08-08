@@ -3,10 +3,15 @@ import {
   BadgeCheck,
   Bell,
   Building2,
+  CalendarCheck,
   CalendarDays,
+  CalendarPlus,
+  CalendarRange,
+  CalendarX2,
   ClipboardCheck,
   FileBarChart,
   FilePlus2,
+  FileSpreadsheet,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -14,7 +19,10 @@ import {
   ScrollText,
   ShieldCheck,
   Settings as SettingsIcon,
+  Tags,
+  UserCheck,
   Users,
+  Wallet,
   XCircle,
   type LucideIcon,
 } from 'lucide-react';
@@ -27,7 +35,7 @@ export interface NavItem {
   /** The item renders only if the user holds ANY of these. Empty = always. */
   permissions?: string[];
   /** Key into the badge-count map supplied by the sidebar. */
-  badgeKey?: 'pending' | 'hrReview' | 'security' | 'notifications';
+  badgeKey?: 'pending' | 'hrReview' | 'security' | 'notifications' | 'leaveApproval';
   /** Match child routes too (e.g. /gate-pass/:id under "My Gate Pass"). */
   matchPrefix?: string;
 }
@@ -137,6 +145,55 @@ export const NAVIGATION: NavSection[] = [
         permissions: [PERMISSION.SECURITY_ACCESS],
         badgeKey: 'security',
         matchPrefix: '/security',
+      },
+    ],
+  },
+  /**
+   * Leave Management — scaffolding.
+   *
+   * These entries carry NO `permissions` yet, so they render for every signed-in
+   * user. That is deliberate: the `leave.*` permission vocabulary does not exist
+   * in the backend `constants/index.js` yet, and gating on keys no role holds
+   * would hide the whole section from everyone except Super Admin (who bypasses
+   * every check). Scaffolding with blank pages carries no data-exposure risk.
+   *
+   * When the leave permissions land, add one `permissions: [...]` line per entry
+   * here and the matching guard in `routes/index.tsx` — the sidebar is derived,
+   * so nothing else needs to change.
+   */
+  {
+    title: 'Leave Management',
+    items: [
+      { label: 'Leave Dashboard', to: '/leave/dashboard', icon: CalendarRange },
+      { label: 'Leave Types', to: '/leave/types', icon: Tags, permissions: [PERMISSION.LEAVE_TYPE_VIEW] },
+      { label: 'Leave Allocation', to: '/leave/allocation', icon: Wallet, permissions: [PERMISSION.LEAVE_ALLOCATION_VIEW] },
+      { label: 'Apply Leave', to: '/leave/apply', icon: CalendarPlus, permissions: [PERMISSION.LEAVE_APPLY] },
+      {
+        label: 'My Leaves',
+        to: '/leave/my-leaves',
+        icon: CalendarCheck,
+        permissions: [PERMISSION.LEAVE_VIEW_OWN],
+        matchPrefix: '/leave/my-leaves',
+      },
+      {
+        label: 'Leave Approval',
+        to: '/leave/approvals',
+        icon: UserCheck,
+        permissions: [PERMISSION.LEAVE_APPROVE, PERMISSION.LEAVE_HR_REVIEW],
+        badgeKey: 'leaveApproval',
+        matchPrefix: '/leave/approvals',
+      },
+      {
+        label: 'Leave Deletion',
+        to: '/leave/deletion',
+        icon: CalendarX2,
+        permissions: [PERMISSION.LEAVE_DELETE],
+      },
+      {
+        label: 'Leave Reports',
+        to: '/leave/reports',
+        icon: FileSpreadsheet,
+        permissions: [PERMISSION.LEAVE_REPORTS_VIEW],
       },
     ],
   },

@@ -3,6 +3,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useQuery } from '@tanstack/react-query';
 import { gatePassApi, hrApi, notificationApi, securityApi } from '@/services/endpoints';
+import { leaveApprovalApi } from '@/services/leave.endpoints';
 import { usePermissions } from '@/permissions/usePermissions';
 import { PERMISSION } from '@/permissions/constants';
 import { pageVariants } from '@/animations/variants';
@@ -15,7 +16,7 @@ import { cn } from '@/utils/cn';
 
 /** Live counts for the sidebar badges — each query only runs if the user can see it. */
 const useSidebarBadges = () => {
-  const { can } = usePermissions();
+  const { can, canAny } = usePermissions();
 
   const approvals = useQuery({
     queryKey: ['gate-passes', 'pending-approval', 'badge'],
@@ -44,11 +45,20 @@ const useSidebarBadges = () => {
     refetchInterval: 60_000,
   });
 
+  /* Leave module — both workflow stages roll into one sidebar badge. */
+  const leaveApprovals = useQuery({
+    queryKey: ['leave', 'approvals', 'counts'],
+    queryFn: leaveApprovalApi.counts,
+    enabled: canAny(PERMISSION.LEAVE_APPROVE, PERMISSION.LEAVE_HR_REVIEW),
+    refetchInterval: 120_000,
+  });
+
   return {
     pending: approvals.data?.meta.total ?? 0,
     hrReview: hrQueue.data?.meta.total ?? 0,
     security: securityQueue.data?.meta.total ?? 0,
     notifications: notifications.data?.count ?? 0,
+    leaveApproval: (leaveApprovals.data?.manager ?? 0) + (leaveApprovals.data?.hr ?? 0),
   };
 };
 

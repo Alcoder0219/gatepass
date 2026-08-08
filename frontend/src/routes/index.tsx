@@ -30,6 +30,16 @@ const RejectedPasses = lazyWithRetry(() => import('@/pages/approvals/RejectedPas
 const HRReview = lazyWithRetry(() => import('@/pages/hr/HRReview'));
 const SecurityConsole = lazyWithRetry(() => import('@/pages/security/SecurityConsole'));
 
+/* Leave Management — scaffolding. Blank pages; no business logic yet. */
+const LeaveDashboard = lazyWithRetry(() => import('@/pages/leave/LeaveDashboard'));
+const LeaveTypes = lazyWithRetry(() => import('@/pages/leave/LeaveTypes'));
+const LeaveAllocation = lazyWithRetry(() => import('@/pages/leave/LeaveAllocation'));
+const ApplyLeave = lazyWithRetry(() => import('@/pages/leave/ApplyLeave'));
+const MyLeaves = lazyWithRetry(() => import('@/pages/leave/MyLeaves'));
+const LeaveApproval = lazyWithRetry(() => import('@/pages/leave/LeaveApproval'));
+const LeaveDeletion = lazyWithRetry(() => import('@/pages/leave/LeaveDeletion'));
+const LeaveReports = lazyWithRetry(() => import('@/pages/leave/LeaveReports'));
+
 const Reports = lazyWithRetry(() => import('@/pages/Reports'));
 const NotificationsPage = lazyWithRetry(() => import('@/pages/Notifications'));
 const AuditLogs = lazyWithRetry(() => import('@/pages/AuditLogs'));
@@ -147,6 +157,29 @@ export const AppRoutes = () => {
         <Route path="/hr-review/:id" element={guard(<GatePassDetail />, [PERMISSION.HR_REVIEW_VIEW])} />
         <Route path="/security" element={guard(<SecurityConsole />, [PERMISSION.SECURITY_ACCESS])} />
         <Route path="/security/:id" element={guard(<GatePassDetail />, [PERMISSION.SECURITY_ACCESS])} />
+
+        {/* Leave Management — scaffolding.
+            Ungated for now: the `leave.*` permissions do not exist in the backend
+            vocabulary yet. Add the guard array per route alongside the matching
+            `permissions` in routes/navigation.ts when they land. */}
+        <Route path="/leave" element={<Navigate to="/leave/dashboard" replace />} />
+        <Route path="/leave/dashboard" element={guard(<LeaveDashboard />)} />
+        <Route path="/leave/types" element={guard(<LeaveTypes />, [PERMISSION.LEAVE_TYPE_VIEW])} />
+        <Route
+          path="/leave/allocation"
+          element={guard(<LeaveAllocation />, [PERMISSION.LEAVE_ALLOCATION_VIEW])}
+        />
+        <Route path="/leave/apply" element={guard(<ApplyLeave />, [PERMISSION.LEAVE_APPLY])} />
+        <Route path="/leave/my-leaves" element={guard(<MyLeaves />)} />
+        <Route
+          path="/leave/approvals"
+          element={guard(<LeaveApproval />, [PERMISSION.LEAVE_APPROVE, PERMISSION.LEAVE_HR_REVIEW])}
+        />
+        <Route path="/leave/deletion" element={guard(<LeaveDeletion />, [PERMISSION.LEAVE_DELETE])} />
+        <Route
+          path="/leave/reports"
+          element={guard(<LeaveReports />, [PERMISSION.LEAVE_REPORTS_VIEW])}
+        />
 
         {/* Insights */}
         <Route path="/reports" element={guard(<Reports />, [PERMISSION.REPORTS_VIEW])} />

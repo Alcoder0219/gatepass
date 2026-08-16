@@ -3,6 +3,7 @@ import { notify } from '../../../services/notification.service.js';
 import { recordAudit } from '../../../services/audit.service.js';
 import { NOTIFICATION_TYPE, AUDIT_ACTION } from '../../../constants/index.js';
 import { dateFilter, dayjs } from '../../../utils/dates.js';
+import env from '../../../config/env.js';
 
 import LeaveRequest from '../models/LeaveRequest.js';
 import { release, refund } from './leaveBalance.service.js';
@@ -218,6 +219,19 @@ export const deleteLeave = async (actor, id, { reason, req } = {}) => {
         : `${request.leaveNumber} was deleted by ${actor.name}. Reason: ${reason.trim()}`,
     link: '/leave/my-leaves',
     meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+    email: true,
+    emailTemplate: 'leaveCancelled',
+    emailData: {
+      leaveNumber: request.leaveNumber,
+      leaveTypeName: request.leaveTypeName,
+      fromDate: dayjs(request.fromDate).format('DD MMM YYYY'),
+      toDate: dayjs(request.toDate).format('DD MMM YYYY'),
+      totalDays: request.totalDays,
+      restoredDays: restoredDays > 0 ? `${restoredDays} day(s)` : 'None',
+      deletedBy: actor.name,
+      reason: reason.trim(),
+      link: `${env.clientUrl}/leave/my-leaves`,
+    },
   });
 
   await recordAudit({

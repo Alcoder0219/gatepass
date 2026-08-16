@@ -17,6 +17,29 @@ import { LEAVE_STATUS, LEAVE_STAGE, DAY_PART, ACTIVE_HOLD_STATUSES } from '../co
 
 const linkTo = (request) => `${env.clientUrl}/leave/${request._id}`;
 
+/**
+ * The standard fact sheet every leave email shows. Mirrors `emailFacts` in
+ * gatepass.service.js so both modules feed the templates the same shape.
+ * Additive only — it enriches `emailData`; no workflow logic is touched.
+ */
+const leaveEmailFacts = (request, extra = {}) => ({
+  leaveNumber: request.leaveNumber,
+  employeeName: request.employeeName,
+  employeeCode: request.employeeCode,
+  departmentName: request.departmentName,
+  unitName: request.unitName,
+  designation: request.designation,
+  leaveTypeName: request.leaveTypeName,
+  fromDate: dayjs(request.fromDate).format('DD MMM YYYY'),
+  toDate: dayjs(request.toDate).format('DD MMM YYYY'),
+  totalDays: request.totalDays,
+  reason: request.reason,
+  contactDuringLeave: request.contactDuringLeave,
+  status: request.status,
+  link: `${env.clientUrl}/leave/my-leaves`,
+  ...extra,
+});
+
 /** Statuses that still hold a claim on the employee's calendar. */
 const OVERLAP_STATUSES = ACTIVE_HOLD_STATUSES;
 
@@ -280,6 +303,9 @@ export const applyForLeave = async (actor, payload, { req, onBehalfOf = null } =
     // The leave module rides on `meta` rather than adding a ref field to the
     // shared Notification model.
     meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+    email: true,
+    emailTemplate: 'leaveSubmitted',
+    emailData: leaveEmailFacts(request, { link: `${env.clientUrl}/leave/approvals` }),
   });
 
   if (isOnBehalf) {
@@ -291,6 +317,9 @@ export const applyForLeave = async (actor, payload, { req, onBehalfOf = null } =
       message: `${actor.name} applied for ${computed.totalDays} day(s) of ${leaveType.name} for you`,
       link: `/leave/my-leaves`,
       meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+      email: true,
+      emailTemplate: 'leaveAppliedOnBehalf',
+      emailData: leaveEmailFacts(request, { appliedBy: actor.name }),
     });
   }
 

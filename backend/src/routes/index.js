@@ -16,6 +16,8 @@ import auditRoutes from './audit.routes.js';
 import settingsRoutes from './settings.routes.js';
 import searchRoutes from './search.routes.js';
 import leaveModuleRoutes from '../modules/leave/routes/index.js';
+import emailTestRoutes from './emailTest.routes.js';
+import env from '../config/env.js';
 import logger from '../utils/logger.js';
 
 const router = Router();
@@ -67,5 +69,19 @@ router.use('/search', searchRoutes);
 
 /* Leave Management — self-contained under src/modules/leave. */
 router.use('/leave', leaveModuleRoutes);
+
+/*
+ * Gmail transport diagnostics. NOT mounted in production, so the routes do not
+ * exist at all there — a 404, not a 403. The escape hatch is deliberate and
+ * explicit for a one-off check against a deployed environment; the router still
+ * demands authentication and `settings.update` either way.
+ */
+if (!env.isProd || process.env.EMAIL_TEST_ROUTE_ENABLED === 'true') {
+  router.use('/email-test', emailTestRoutes);
+  logger.warn(
+    `Gmail test routes mounted at ${env.apiPrefix}/email-test ` +
+      `(NODE_ENV=${env.nodeEnv}) — admin only, never expose these publicly`
+  );
+}
 
 export default router;

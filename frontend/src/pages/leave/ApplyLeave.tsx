@@ -174,10 +174,25 @@ const ApplyLeave = () => {
     400
   );
 
+  /*
+   * Gate on the DEBOUNCED payload, not the live form values.
+   *
+   * `enabled` used to read `values.*` while the request body came from
+   * `previewKey`, which lags by the debounce. On first load that let the query
+   * fire with a leaveType the debounce had not caught up to yet — one 422 per
+   * page load, self-correcting 400ms later but noisy in the console and logs.
+   */
+  const previewPayload = useMemo(() => JSON.parse(previewKey), [previewKey]);
+
   const { data: preview, error: previewError } = useQuery({
     queryKey: ['leave', 'apply', 'preview', previewKey],
-    queryFn: () => leaveApplicationApi.preview(JSON.parse(previewKey)),
-    enabled: Boolean(values.leaveType && values.fromDate && values.toDate && values.toDate >= values.fromDate),
+    queryFn: () => leaveApplicationApi.preview(previewPayload),
+    enabled: Boolean(
+      previewPayload.leaveType &&
+        previewPayload.fromDate &&
+        previewPayload.toDate &&
+        previewPayload.toDate >= previewPayload.fromDate
+    ),
     retry: false,
   });
 

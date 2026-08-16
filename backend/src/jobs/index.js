@@ -1,5 +1,6 @@
 import logger from '../utils/logger.js';
 import { runExpiryJob } from '../services/gatepass.service.js';
+import { retryFailedEmails } from '../services/emailDispatch.service.js';
 
 /**
  * Lightweight in-process scheduler. The expiry/reminder sweep is idempotent, so
@@ -21,6 +22,21 @@ export const startJobs = () => {
       await runExpiryJob();
     } catch (error) {
       logger.error(`Expiry job failed: ${error.message}`);
+    }
+
+    /*
+     * Email retry sweep — separate try/catch on purpose so a mail problem can
+     * never stop the gate pass expiry sweep above, which is the job this
+     * scheduler already existed to run.
+     *
+     * `retryFailedEmails` only picks up notifications still marked FAILED and
+     * flips them to SENT on success, so a message that already went out can
+     * never be sent twice.
+     */
+    try {
+      await retryFailedEmails();
+    } catch (error) {
+      logger.error(`Email retry job failed: ${error.message}`);
     }
   }, INTERVAL_MS);
 

@@ -1,4 +1,6 @@
 import ApiError from '../../../utils/ApiError.js';
+import env from '../../../config/env.js';
+import { dayjs } from '../../../utils/dates.js';
 import User from '../../../models/User.js';
 import { notify, notifyRole } from '../../../services/notification.service.js';
 import { recordAudit } from '../../../services/audit.service.js';
@@ -68,7 +70,28 @@ const pushTimeline = (request, entry) => {
   request.timeline.push({ at: new Date(), ...entry });
 };
 
-const notifyEmployee = async (request, actor, { title, message }) => {
+/**
+ * Standard fact sheet for leave decision emails. Mirrors the gate pass
+ * `emailFacts` so the templates receive a consistent shape.
+ */
+const leaveFacts = (request, extra = {}) => ({
+  leaveNumber: request.leaveNumber,
+  employeeName: request.employeeName,
+  employeeCode: request.employeeCode,
+  departmentName: request.departmentName,
+  unitName: request.unitName,
+  designation: request.designation,
+  leaveTypeName: request.leaveTypeName,
+  fromDate: dayjs(request.fromDate).format('DD MMM YYYY'),
+  toDate: dayjs(request.toDate).format('DD MMM YYYY'),
+  totalDays: request.totalDays,
+  reason: request.reason,
+  status: request.status,
+  link: `${env.clientUrl}/leave/my-leaves`,
+  ...extra,
+});
+
+const notifyEmployee = async (request, actor, { title, message, template, data }) => {
   await notify({
     recipient: request.employee,
     actor,
@@ -77,6 +100,11 @@ const notifyEmployee = async (request, actor, { title, message }) => {
     message,
     link: '/leave/my-leaves',
     meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+    // Email only when the caller supplies a template; recipient resolves from
+    // the User record inside notify(), never from a request body.
+    email: Boolean(template),
+    emailTemplate: template,
+    emailData: data,
   });
 };
 
@@ -185,6 +213,8 @@ export const approveByManager = async (user, request, { remarks = '', req } = {}
   await notifyEmployee(request, user, {
     title: 'Leave approved by your manager',
     message: `${request.leaveNumber} cleared ${user.name} and is now with HR.`,
+    template: 'leaveForwarded',
+    data: leaveFacts(request, { approvedBy: user.name, remarks }),
   });
 
   await notifyRole(ROLE.HR, {
@@ -194,6 +224,12 @@ export const approveByManager = async (user, request, { remarks = '', req } = {}
     message: `${request.employeeName} · ${request.totalDays} day(s) of ${request.leaveTypeName}`,
     link: '/leave/approvals',
     meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+    email: true,
+    emailTemplate: 'leaveHrReview',
+    emailData: leaveFacts(request, {
+      approvedBy: user.name,
+      link: `${env.clientUrl}/leave/approvals`,
+    }),
   });
 
   await recordAudit({
@@ -252,6 +288,12 @@ export const approveByHr = async (user, request, { remarks = '', req } = {}) => 
   await notifyEmployee(request, user, {
     title: 'Leave approved',
     message: `${request.leaveNumber} is approved. ${request.totalDays} day(s) of ${request.leaveTypeName} have been deducted from your balance.`,
+    template: 'leaveApproved',
+    data: leaveFacts(request, {
+      approvedBy: user.name,
+      remarks,
+      balanceDeducted: `${request.totalDays} day(s)`,
+    }),
   });
 
   await recordAudit({
@@ -304,6 +346,9 @@ export const sendBackToManager = async (user, request, { remarks = '', req } = {
     message: `${request.leaveNumber} (${request.employeeName}) needs another look.`,
     link: '/leave/approvals',
     meta: { module: 'LEAVE', leaveRequestId: String(request._id), leaveNumber: request.leaveNumber },
+    email: true,
+    emailTemplate: 'leaveSentBack',
+    emailData: leaveFacts(request, { remarks, link: `${env.clientUrl}/leave/approvals` }),
   });
 
   await recordAudit({
@@ -383,6 +428,12 @@ export const rejectRequest = async (user, request, { remarks = '', req } = {}) =
   await notifyEmployee(request, user, {
     title: 'Leave rejected',
     message: `${request.leaveNumber} was rejected by ${user.name}. Your balance is unchanged. Reason: ${remarks}`,
+    template: 'leaveRejected',
+    data: leaveFacts(request, {
+      rejectedBy: user.name,
+      remarks,
+      stage: stage === 'MANAGER' ? 'Reporting manager' : 'HR review',
+    }),
   });
 
   await recordAudit({

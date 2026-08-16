@@ -24,6 +24,35 @@ import { dayjs } from '../utils/dates.js';
 
 const linkTo = (gatePass) => `${env.clientUrl}/gate-pass/${gatePass._id}`;
 
+/**
+ * The standard fact sheet every gate pass email shows.
+ *
+ * Built once here so the templates always receive the same keys and no call
+ * site has to remember the full list. Purely additive — it only enriches the
+ * `emailData` already passed to `notify()`; no workflow, status or recipient
+ * logic is touched.
+ */
+const emailFacts = (gatePass, extra = {}) => ({
+  gatePassNumber: gatePass.gatePassNumber,
+  employeeName: gatePass.employeeName,
+  employeeCode: gatePass.employeeCode,
+  departmentName: gatePass.departmentName,
+  unitName: gatePass.unitName,
+  designation: gatePass.designation,
+  type: gatePass.type,
+  reason: gatePass.reason,
+  purpose: gatePass.purpose,
+  expectedOutTime: gatePass.expectedOutTime
+    ? dayjs(gatePass.expectedOutTime).format('DD MMM YYYY, HH:mm')
+    : '',
+  expectedInTime: gatePass.expectedInTime
+    ? dayjs(gatePass.expectedInTime).format('DD MMM YYYY, HH:mm')
+    : '',
+  status: gatePass.status,
+  link: linkTo(gatePass),
+  ...extra,
+});
+
 /** Guards every state change against the transition table. */
 const assertTransition = (from, to) => {
   const allowed = STATUS_TRANSITIONS[from] ?? [];
@@ -127,13 +156,7 @@ export const createGatePass = async (user, payload, { req, attachments = [] } = 
       gatePass,
       email: true,
       emailTemplate: 'gatePassSubmitted',
-      emailData: {
-        gatePassNumber: gatePass.gatePassNumber,
-        employeeName: user.name,
-        type: gatePass.type,
-        reason: gatePass.reason,
-        link: linkTo(gatePass),
-      },
+      emailData: emailFacts(gatePass, { employeeName: user.name }),
     });
   }
 
@@ -215,11 +238,7 @@ export const approveGatePass = async (user, gatePass, { comment = '', req } = {}
       gatePass,
       email: true,
       emailTemplate: 'hrReviewPending',
-      emailData: {
-        gatePassNumber: gatePass.gatePassNumber,
-        employeeName: gatePass.employeeName,
-        link: linkTo(gatePass),
-      },
+      emailData: emailFacts(gatePass, { approvedBy: user.name, link: `${env.clientUrl}/hr-review/${gatePass._id}` }),
     });
 
     await notify({
@@ -289,12 +308,12 @@ export const rejectGatePass = async (user, gatePass, { comment = '', req } = {})
     gatePass,
     email: true,
     emailTemplate: 'gatePassRejected',
-    emailData: {
-      gatePassNumber: gatePass.gatePassNumber,
+    emailData: emailFacts(gatePass, {
       rejectedBy: user.name,
       comment,
-      link: linkTo(gatePass),
-    },
+      // `from` is the status captured above, before it was set to REJECTED.
+      stage: from === GATEPASS_STATUS.HR_REVIEW ? 'HR review' : 'Reporting manager',
+    }),
   });
 
   await recordAudit({
@@ -345,12 +364,7 @@ export const requestChanges = async (user, gatePass, { comment = '', req } = {})
     gatePass,
     email: true,
     emailTemplate: 'changesRequested',
-    emailData: {
-      gatePassNumber: gatePass.gatePassNumber,
-      requestedBy: user.name,
-      comment,
-      link: linkTo(gatePass),
-    },
+    emailData: emailFacts(gatePass, { requestedBy: user.name, comment }),
   });
 
   await recordAudit({
@@ -489,11 +503,9 @@ export const reviewGatePass = async (user, gatePass, { status, comment = '', req
       gatePass,
       email: true,
       emailTemplate: 'reminder',
-      emailData: {
-        gatePassNumber: gatePass.gatePassNumber,
+      emailData: emailFacts(gatePass, {
         message: `HR marked this gate pass as Not OK: ${comment}`,
-        link: linkTo(gatePass),
-      },
+      }),
     });
 
     await notify({
@@ -668,12 +680,11 @@ export const markReturn = async (user, gatePass, { remark = '', photo = '', meth
     gatePass,
     email: true,
     emailTemplate: 'gatePassCompleted',
-    emailData: {
-      gatePassNumber: gatePass.gatePassNumber,
+    emailData: emailFacts(gatePass, {
       outTime: dayjs(gatePass.security.actualOutTime).format('DD MMM YYYY, HH:mm'),
       inTime: dayjs(now).format('DD MMM YYYY, HH:mm'),
-      link: linkTo(gatePass),
-    },
+      lateBy: gatePass.isLate ? `${gatePass.lateByMinutes} minutes` : 'On time',
+    }),
   });
 
   await recordAudit({
@@ -755,11 +766,7 @@ async function notifyEmployeeApproved(gatePass, actor) {
     gatePass,
     email: true,
     emailTemplate: 'gatePassApproved',
-    emailData: {
-      gatePassNumber: gatePass.gatePassNumber,
-      approvedBy: actor.name,
-      link: linkTo(gatePass),
-    },
+    emailData: emailFacts(gatePass, { approvedBy: actor.name }),
   });
 }
 
@@ -771,6 +778,12 @@ async function notifySecurity(gatePass) {
     link: `/security/${gatePass._id}`,
     gatePass,
     unit: gatePass.unit,
+    // The security desk was the one stage with no email. Recipients still come
+    // from `notifyRole`, which resolves active holders of the SECURITY role
+    // (scoped to the unit) from the database — never from a request.
+    email: true,
+    emailTemplate: 'securityActionRequired',
+    emailData: emailFacts(gatePass, { link: `${env.clientUrl}/security/${gatePass._id}` }),
   });
   emitToRole(ROLE.SECURITY, SOCKET_EVENT.DASHBOARD_REFRESH, { reason: 'GATEPASS_APPROVED' });
 }

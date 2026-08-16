@@ -24,11 +24,6 @@ import type {
   UserImportSummary,
 } from '@/types';
 
-/**
- * Strips empty strings / undefined so they never reach the query string.
- * Takes `object` rather than `Record<string, unknown>` so typed filter
- * interfaces (which have no index signature) can be passed directly.
- */
 const clean = (params: object = {}) =>
   Object.fromEntries(
     Object.entries(params).filter(([, v]) => v !== undefined && v !== null && v !== '' && v !== 'ALL')

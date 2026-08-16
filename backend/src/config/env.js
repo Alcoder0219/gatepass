@@ -65,6 +65,48 @@ export const env = {
     from: process.env.MAIL_FROM || 'GatePass Pro <no-reply@gatepasspro.io>',
   },
 
+  /**
+   * Gmail API transport (service account + domain-wide delegation).
+   *
+   * Entirely separate from `mail` above: the existing SMTP/nodemailer transport
+   * is untouched and keeps serving every current workflow. Nothing switches to
+   * Gmail until a caller explicitly uses `gmail.service.js`.
+   *
+   * In Cloud Run these arrive as environment variables / Secret Manager refs.
+   * The private key is never read from a file and never logged.
+   */
+  gmail: {
+    enabled: process.env.GMAIL_ENABLED === 'true',
+    serviceAccountEmail: process.env.GMAIL_SERVICE_ACCOUNT_EMAIL || '',
+    /**
+     * Secret managers and shell env vars almost always carry the PEM with
+     * literal backslash-n rather than real newlines; the Google JWT client
+     * rejects that with an opaque "error:1E08010C:DECODER routines" failure.
+     * Normalising here means every caller gets a usable key.
+     */
+    serviceAccountPrivateKey: (process.env.GMAIL_SERVICE_ACCOUNT_PRIVATE_KEY || '').replace(
+      /\\n/g,
+      '\n'
+    ),
+    /**
+     * Local development alternative to the two variables above: a path to the
+     * downloaded service-account JSON, relative to `backend/`.
+     *
+     * The env vars take precedence, so Cloud Run — where no file exists — is
+     * always deterministic and a stray local file can never override it.
+     * The file is read lazily, only when the first email is sent.
+     */
+    serviceAccountKeyPath: process.env.GMAIL_SERVICE_ACCOUNT_KEY_PATH || '',
+
+    /** The Workspace user the service account impersonates. */
+    impersonateUser: process.env.GMAIL_IMPERSONATE_USER || '',
+    projectId: process.env.GMAIL_PROJECT_ID || '',
+    /** Minimum scope for sending. Do not widen without a reason. */
+    scopes: ['https://www.googleapis.com/auth/gmail.send'],
+    /** Falls back to MAIL_FROM so a single variable can drive both transports. */
+    from: process.env.GMAIL_FROM || process.env.MAIL_FROM || '',
+  },
+
   security: {
     saltRounds: int(process.env.BCRYPT_SALT_ROUNDS, 10),
     otpExpiryMinutes: int(process.env.OTP_EXPIRY_MINUTES, 10),

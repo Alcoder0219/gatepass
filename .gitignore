@@ -4,6 +4,16 @@ build/
 *.tsbuildinfo
 .env
 .env.local
+
+# Google service-account keys. Additive hardening only — these patterns widen
+# what is ignored, they never expose anything. A downloaded GCP key must never
+# reach the repository; supply it through env vars / Secret Manager instead.
+*service-account*.json
+*serviceaccount*.json
+gcp-*.json
+*-key.json
+credentials.json
+client_secret*.json
 *.log
 backend/src/logs/
 backend/uploads/
@@ -13,3 +23,9 @@ coverage/
 
 # Personal Claude Code settings
 .claude/settings.local.json
+.env
+.env.local
+
+# Local secrets
+secrets/
+**/secrets/

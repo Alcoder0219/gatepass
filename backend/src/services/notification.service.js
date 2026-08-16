@@ -4,7 +4,7 @@ import Role from '../models/Role.js';
 import logger from '../utils/logger.js';
 import { getSettings } from './settings.service.js';
 import { emitToUser, emitToRole } from './socket.service.js';
-import { sendTemplate } from './email.service.js';
+import { dispatchTemplateEmail } from './emailDispatch.service.js';
 import { SOCKET_EVENT, NOTIFICATION_TYPE } from '../constants/index.js';
 
 /**
@@ -70,8 +70,32 @@ export const notify = async ({
     });
 
     if (wantsEmail && emailTemplate && user.email) {
-      // Deliberately not awaited — mail latency must not block the API response.
-      sendTemplate(emailTemplate, { to: user.email, name: user.name, ...emailData }).catch(() => {});
+      // Mark it queued before dispatching, so a process that dies mid-send
+      // leaves a PENDING row rather than a silently lost email.
+      doc.emailDelivery = {
+        status: 'PENDING',
+        recipientEmail: user.email,
+        template: emailTemplate,
+        attempts: 0,
+      };
+      await doc.save();
+
+      /*
+       * Deliberately NOT awaited — mail latency must not block the API
+       * response, exactly as before. What changed is only the destination:
+       * `dispatchTemplateEmail` picks Gmail when it is configured and falls
+       * back to the original SMTP/console transport otherwise, and records the
+       * outcome so the retry job can pick up failures.
+       *
+       * The recipient comes from the User record loaded above — never from a
+       * request body.
+       */
+      dispatchTemplateEmail({
+        notification: doc,
+        to: user.email,
+        template: emailTemplate,
+        data: { name: user.name, ...emailData },
+      }).catch((error) => logger.error(`Email dispatch failed: ${error.message}`));
     }
 
     return doc;
